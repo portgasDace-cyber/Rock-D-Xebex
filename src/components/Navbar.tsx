@@ -16,22 +16,32 @@ const Navbar = () => {
   const [user, setUser] = useState<any>(null);
   const [cartCount, setCartCount] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [profileName, setProfileName] = useState<string | null>(null);
 
   useEffect(() => {
-    const checkAdmin = async (userId: string) => {
-      const { data } = await supabase
+    const checkAdminAndProfile = async (userId: string) => {
+      // Check admin role
+      const { data: roleData } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", userId)
         .eq("role", "admin")
         .maybeSingle();
-      setIsAdmin(!!data);
+      setIsAdmin(!!roleData);
+
+      // Get profile name
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("user_id", userId)
+        .maybeSingle();
+      setProfileName(profileData?.full_name || null);
     };
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
-        checkAdmin(session.user.id);
+        checkAdminAndProfile(session.user.id);
       }
     });
 
@@ -40,9 +50,10 @@ const Navbar = () => {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       if (session?.user) {
-        setTimeout(() => checkAdmin(session.user.id), 0);
+        setTimeout(() => checkAdminAndProfile(session.user.id), 0);
       } else {
         setIsAdmin(false);
+        setProfileName(null);
       }
     });
 
@@ -106,8 +117,13 @@ const Navbar = () => {
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <User className="h-5 w-5" />
+                  <Button variant="ghost" size="sm" className="gap-2">
+                    <User className="h-4 w-4" />
+                    {profileName && (
+                      <span className="hidden sm:inline max-w-[100px] truncate">
+                        {profileName}
+                      </span>
+                    )}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
