@@ -450,14 +450,21 @@ const Cart = () => {
                 <div className="space-y-4 border-t pt-6">
                   <div>
                     <Label htmlFor="phone">Phone Number</Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="+91 9876543210"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="mt-1"
-                    />
+                    {phone ? (
+                      <div className="mt-1 flex items-center justify-between p-3 bg-muted rounded-md">
+                        <span className="font-medium">{phone}</span>
+                        <Link to="/profile" className="text-xs text-primary hover:underline">
+                          Edit in Profile
+                        </Link>
+                      </div>
+                    ) : (
+                      <div className="mt-1 p-3 bg-muted/50 rounded-md text-center">
+                        <p className="text-sm text-muted-foreground mb-2">No phone number saved</p>
+                        <Link to="/profile">
+                          <Button variant="outline" size="sm">Add in Profile</Button>
+                        </Link>
+                      </div>
+                    )}
                   </div>
 
                   <div>
