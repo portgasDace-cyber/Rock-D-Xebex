@@ -104,9 +104,26 @@ const Cart = () => {
     const savedCart = JSON.parse(localStorage.getItem("cart") || "[]");
     setCart(savedCart);
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const fetchUserAndProfile = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user ?? null);
-    });
+
+      // Auto-fill from saved profile
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("phone, address")
+          .eq("user_id", session.user.id)
+          .single();
+
+        if (profile) {
+          if (profile.phone && !phone) setPhone(profile.phone);
+          if (profile.address && !address) setAddress(profile.address);
+        }
+      }
+    };
+
+    fetchUserAndProfile();
 
     // Fetch store location for delivery fee calculation
     if (savedCart.length > 0) {
