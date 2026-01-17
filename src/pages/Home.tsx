@@ -1,13 +1,48 @@
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ShoppingBag, Clock, MapPin, Heart } from "lucide-react";
 import BeeAnimation from "@/components/BeeAnimation";
 import Navbar from "@/components/Navbar";
 import DailyOffers from "@/components/DailyOffers";
 import beeMascot from "@/assets/bee-mascot.png";
+import { supabase } from "@/integrations/supabase/client";
+
+const GUIDE_SEEN_KEY = "carrybee_user_guide_seen";
 
 const Home = () => {
+  const [welcomeName, setWelcomeName] = useState<string | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const loggedIn = !!session?.user;
+      setIsLoggedIn(loggedIn);
+
+      if (!loggedIn || !session?.user) return;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("user_id", session.user.id)
+        .maybeSingle();
+
+      setWelcomeName(profile?.full_name || null);
+
+      const seen = localStorage.getItem(GUIDE_SEEN_KEY) === "1";
+      if (!seen) setShowGuide(true);
+    };
+
+    load();
+  }, []);
+
   const features = [
     {
       icon: <Clock className="w-8 h-8 text-primary" />,
@@ -38,6 +73,25 @@ const Home = () => {
 
       {/* Daily Offers Section */}
       <DailyOffers />
+
+      {/* Welcome banner */}
+      {isLoggedIn && (
+        <section className="container mx-auto px-4 pt-6">
+          <Card className="border-border/60">
+            <CardContent className="p-4 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Welcome back</p>
+                <p className="font-outfit font-semibold text-lg">
+                  {welcomeName ? `Hi, ${welcomeName}!` : "Hi!"}
+                </p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => setShowGuide(true)}>
+                User Guide
+              </Button>
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
       {/* Hero Section */}
       <section className="container mx-auto px-4 py-16 md:py-24">
@@ -79,9 +133,7 @@ const Home = () => {
 
       {/* Features Section */}
       <section className="container mx-auto px-4 py-16">
-        <h2 className="text-3xl md:text-4xl font-outfit font-bold text-center mb-12">
-          Why Choose Carry Bee?
-        </h2>
+        <h2 className="text-3xl md:text-4xl font-outfit font-bold text-center mb-12">Why Choose Carry Bee?</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {features.map((feature, index) => (
             <Card
@@ -105,9 +157,7 @@ const Home = () => {
       <section className="container mx-auto px-4 py-16">
         <Card className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
           <CardContent className="p-8 md:p-12 text-center space-y-6">
-            <h2 className="text-3xl md:text-4xl font-outfit font-bold">
-              Ready to Get Started?
-            </h2>
+            <h2 className="text-3xl md:text-4xl font-outfit font-bold">Ready to Get Started?</h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               Join hundreds of happy customers in Kunnathur enjoying fast, reliable delivery from local stores.
             </p>
@@ -126,16 +176,44 @@ const Home = () => {
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-2">
               <img src={beeMascot} alt="Carry Bee" className="w-8 h-8" />
-              <span className="font-outfit font-semibold text-foreground">
-                Kunnathur Carry Bee
-              </span>
+              <span className="font-outfit font-semibold text-foreground">Kunnathur Carry Bee</span>
             </div>
-            <p className="text-sm text-muted-foreground text-center">
-              © 2025 Kunnathur Carry Bee. Fast, local & friendly delivery.
-            </p>
+            <p className="text-sm text-muted-foreground text-center">© 2025 Kunnathur Carry Bee. Fast, local & friendly delivery.</p>
           </div>
         </div>
       </footer>
+
+      {/* First-time user guide */}
+      <Dialog
+        open={showGuide}
+        onOpenChange={(open) => {
+          setShowGuide(open);
+          if (!open) localStorage.setItem(GUIDE_SEEN_KEY, "1");
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-outfit">How to use Carry Bee</DialogTitle>
+            <DialogDescription>Quick steps for new users.</DialogDescription>
+          </DialogHeader>
+
+          <ol className="space-y-2 text-sm text-muted-foreground list-decimal pl-5">
+            <li>Go to <span className="text-foreground">Stores</span> and open a store.</li>
+            <li>Add products to your cart.</li>
+            <li>Checkout (your saved phone/address is used automatically).</li>
+            <li>Track your order in <span className="text-foreground">My Orders</span>.</li>
+          </ol>
+
+          <div className="pt-4 flex flex-col sm:flex-row gap-2 sm:justify-end">
+            <Link to="/profile" className="sm:mr-auto">
+              <Button variant="outline" className="w-full sm:w-auto">Edit Profile</Button>
+            </Link>
+            <Button className="w-full sm:w-auto" onClick={() => setShowGuide(false)}>
+              Got it
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

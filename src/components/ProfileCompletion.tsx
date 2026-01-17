@@ -23,6 +23,24 @@ const ProfileCompletion = ({ user, onComplete }: ProfileCompletionProps) => {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
 
+  useEffect(() => {
+    const loadExistingProfile = async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("full_name, phone, address")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (data) {
+        if (data.full_name) setFullName(data.full_name);
+        if (data.phone) setPhone(data.phone);
+        if (data.address) setAddress(data.address);
+      }
+    };
+
+    loadExistingProfile();
+  }, [user.id]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -30,12 +48,15 @@ const ProfileCompletion = ({ user, onComplete }: ProfileCompletionProps) => {
     try {
       const { error } = await supabase
         .from("profiles")
-        .update({
-          full_name: fullName,
-          phone,
-          address,
-        })
-        .eq("user_id", user.id);
+        .upsert(
+          {
+            user_id: user.id,
+            full_name: fullName || null,
+            phone,
+            address,
+          },
+          { onConflict: "user_id" }
+        );
 
       if (error) throw error;
 

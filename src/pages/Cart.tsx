@@ -110,11 +110,15 @@ const Cart = () => {
 
       // Auto-fill from saved profile
       if (session?.user) {
-        const { data: profile } = await supabase
+        const { data: profile, error } = await supabase
           .from("profiles")
           .select("phone, address")
           .eq("user_id", session.user.id)
-          .single();
+          .maybeSingle();
+
+        if (error && error.code !== "PGRST116") {
+          console.error("Error fetching profile:", error);
+        }
 
         if (profile) {
           if (profile.phone && !phone) setPhone(profile.phone);
@@ -469,14 +473,27 @@ const Cart = () => {
 
                   <div>
                     <Label htmlFor="address">Delivery Address</Label>
-                    <Textarea
-                      id="address"
-                      placeholder="Enter your complete delivery address"
-                      value={address}
-                      onChange={(e) => setAddress(e.target.value)}
-                      className="mt-1"
-                      rows={3}
-                    />
+                    {address ? (
+                      <div className="mt-1 space-y-2">
+                        <Textarea
+                          id="address"
+                          value={address}
+                          disabled
+                          className="bg-muted"
+                          rows={3}
+                        />
+                        <Link to="/profile" className="text-xs text-primary hover:underline inline-block">
+                          Edit in Profile
+                        </Link>
+                      </div>
+                    ) : (
+                      <div className="mt-1 p-3 bg-muted/50 rounded-md text-center">
+                        <p className="text-sm text-muted-foreground mb-2">No address saved</p>
+                        <Link to="/profile">
+                          <Button variant="outline" size="sm">Add in Profile</Button>
+                        </Link>
+                      </div>
+                    )}
                   </div>
 
                   <div>

@@ -23,42 +23,57 @@ const Auth = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        // Check if profile is complete
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("user_id", session.user.id)
-          .single();
+    const handleSignedIn = async (signedInUser: User) => {
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("full_name, phone, address")
+        .eq("user_id", signedInUser.id)
+        .maybeSingle();
 
-        if (profile && (!profile.phone || !profile.address)) {
-          setCurrentUser(session.user);
-          setShowProfileCompletion(true);
-        } else {
-          navigate("/");
-        }
+      // Ensure a profile row exists so upserts/updates always work
+      if (!profile && (error?.code === "PGRST116" || !error)) {
+        await supabase
+          .from("profiles")
+          .upsert(
+            {
+              user_id: signedInUser.id,
+              full_name: signedInUser.user_metadata?.full_name ?? null,
+            },
+            { onConflict: "user_id" }
+          );
+      }
+
+      const isIncomplete = !profile || !profile.phone || !profile.address;
+      if (isIncomplete) {
+        setCurrentUser(signedInUser);
+        setShowProfileCompletion(true);
+      } else {
+        navigate("/");
+      }
+    };
+
+    const checkSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (session?.user) {
+        await handleSignedIn(session.user);
       }
     };
 
     checkSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_IN" && session) {
-        // Check if profile is complete
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("user_id", session.user.id)
-          .single();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_IN" && session?.user) {
+        await handleSignedIn(session.user);
+      }
 
-        if (profile && (!profile.phone || !profile.address)) {
-          setCurrentUser(session.user);
-          setShowProfileCompletion(true);
-        } else {
-          navigate("/");
-        }
+      if (event === "SIGNED_OUT") {
+        setShowProfileCompletion(false);
+        setCurrentUser(null);
       }
     });
 
