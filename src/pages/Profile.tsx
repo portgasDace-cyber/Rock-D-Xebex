@@ -35,7 +35,7 @@ const Profile = () => {
         .from("profiles")
         .select("*")
         .eq("user_id", session.user.id)
-        .single();
+        .maybeSingle();
 
       if (error && error.code !== "PGRST116") {
         console.error("Error fetching profile:", error);
@@ -58,14 +58,19 @@ const Profile = () => {
     setSaving(true);
 
     try {
+      if (!user?.id) throw new Error("Not authenticated");
+
       const { error } = await supabase
         .from("profiles")
-        .update({
-          full_name: fullName,
-          phone,
-          address,
-        })
-        .eq("user_id", user.id);
+        .upsert(
+          {
+            user_id: user.id,
+            full_name: fullName || null,
+            phone,
+            address,
+          },
+          { onConflict: "user_id" }
+        );
 
       if (error) throw error;
 
