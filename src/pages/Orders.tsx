@@ -1,13 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Clock, Package, CheckCircle2, MapPin } from "lucide-react";
+import { MapPin, Package } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
+import OrderTimeline from "@/components/OrderTimeline";
 
 interface Order {
   id: string;
@@ -61,48 +59,6 @@ const Orders = () => {
     setLoading(false);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "bg-yellow-500";
-      case "confirmed":
-        return "bg-blue-500";
-      case "delivered":
-        return "bg-green-500";
-      case "cancelled":
-        return "bg-red-500";
-      default:
-        return "bg-gray-500";
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "pending":
-        return <Clock className="w-4 h-4" />;
-      case "confirmed":
-        return <Package className="w-4 h-4" />;
-      case "delivered":
-        return <CheckCircle2 className="w-4 h-4" />;
-      default:
-        return <Clock className="w-4 h-4" />;
-    }
-  };
-
-  const markAsDelivered = async (orderId: string) => {
-    const { error } = await supabase
-      .from("orders")
-      .update({ status: "delivered" })
-      .eq("id", orderId);
-
-    if (error) {
-      toast.error("Failed to update order status");
-      return;
-    }
-
-    toast.success("Order marked as delivered!");
-    fetchOrders();
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -146,68 +102,51 @@ const Orders = () => {
                 className="animate-scale-in hover:shadow-md transition-shadow"
                 style={{ animationDelay: `${index * 0.1}s` }}
               >
-                <CardContent className="p-6">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="space-y-2 flex-1">
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <Badge
-                          className={`${getStatusColor(order.status)} text-white flex items-center gap-1`}
-                        >
-                          {getStatusIcon(order.status)}
-                          <span className="capitalize">{order.status}</span>
-                        </Badge>
+                <CardContent className="p-6 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm text-muted-foreground">
                           Order #{order.id.slice(0, 8)}
                         </span>
+                        <span className="text-xs text-muted-foreground">•</span>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(order.created_at).toLocaleDateString("en-IN", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })}
+                        </span>
                       </div>
-
                       <h3 className="font-outfit font-semibold text-lg">
                         {order.stores?.name || "Store"}
                       </h3>
-
-                      <p className="text-sm text-muted-foreground">
-                        {order.delivery_address}
-                      </p>
-
-                      {order.latitude && order.longitude && (
-                        <a
-                          href={`https://www.google.com/maps?q=${order.latitude},${order.longitude}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                        >
-                          <MapPin className="w-3 h-3" />
-                          View on Map
-                        </a>
-                      )}
-
-                      <p className="text-xs text-muted-foreground">
-                        Ordered on{" "}
-                        {new Date(order.created_at).toLocaleDateString("en-IN", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </p>
                     </div>
+                    <p className="text-2xl font-bold text-primary">
+                      ₹{order.total_amount}
+                    </p>
+                  </div>
 
-                    <div className="text-left md:text-right space-y-2">
-                      <p className="text-2xl font-bold text-primary">
-                        ₹{order.total_amount}
-                      </p>
-                      {order.status === "pending" && (
-                        <Button
-                          size="sm"
-                          onClick={() => markAsDelivered(order.id)}
-                          className="bg-green-500 hover:bg-green-600"
-                        >
-                          <CheckCircle2 className="w-4 h-4 mr-1" />
-                          Mark as Delivered
-                        </Button>
-                      )}
-                    </div>
+                  {/* Order Timeline */}
+                  <div className="py-2">
+                    <OrderTimeline status={order.status} />
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-border/50">
+                    <p className="text-sm text-muted-foreground truncate max-w-xs">
+                      {order.delivery_address}
+                    </p>
+                    {order.latitude && order.longitude && (
+                      <a
+                        href={`https://www.google.com/maps?q=${order.latitude},${order.longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline shrink-0"
+                      >
+                        <MapPin className="w-3 h-3" />
+                        View on Map
+                      </a>
+                    )}
                   </div>
                 </CardContent>
               </Card>
