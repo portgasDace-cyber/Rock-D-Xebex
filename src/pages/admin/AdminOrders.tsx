@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ShoppingCart, MapPin, Phone, ExternalLink } from "lucide-react";
+import { ShoppingCart, MapPin, Phone, ExternalLink, CheckCircle2, Clock, Truck, Package } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import OrderTimeline from "@/components/OrderTimeline";
 
 interface OrderData {
   id: string;
@@ -70,7 +71,7 @@ const AdminOrders = () => {
     switch (status) {
       case "pending":
         return "bg-orange-100 text-orange-700";
-      case "preparing":
+      case "accepted":
         return "bg-blue-100 text-blue-700";
       case "out_for_delivery":
         return "bg-purple-100 text-purple-700";
@@ -80,6 +81,32 @@ const AdminOrders = () => {
         return "bg-red-100 text-red-700";
       default:
         return "bg-gray-100 text-gray-700";
+    }
+  };
+
+  const getNextStatus = (currentStatus: string) => {
+    switch (currentStatus) {
+      case "pending":
+        return "accepted";
+      case "accepted":
+        return "out_for_delivery";
+      case "out_for_delivery":
+        return "delivered";
+      default:
+        return null;
+    }
+  };
+
+  const getNextStatusLabel = (currentStatus: string) => {
+    switch (currentStatus) {
+      case "pending":
+        return "Accept Order";
+      case "accepted":
+        return "Mark Out for Delivery";
+      case "out_for_delivery":
+        return "Mark Delivered";
+      default:
+        return null;
     }
   };
 
@@ -99,7 +126,7 @@ const AdminOrders = () => {
             <SelectContent>
               <SelectItem value="all">All Orders</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="preparing">Preparing</SelectItem>
+              <SelectItem value="accepted">Accepted</SelectItem>
               <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
               <SelectItem value="delivered">Delivered</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
@@ -219,23 +246,40 @@ const AdminOrders = () => {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <p className="text-muted-foreground">Update Status</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button size="sm" variant="outline" onClick={() => updateOrderStatus(selectedOrder.id, "preparing")}>
-                      Preparing
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => updateOrderStatus(selectedOrder.id, "out_for_delivery")}>
-                      Out for Delivery
-                    </Button>
-                    <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => updateOrderStatus(selectedOrder.id, "delivered")}>
-                      Delivered
-                    </Button>
-                    <Button size="sm" variant="destructive" onClick={() => updateOrderStatus(selectedOrder.id, "cancelled")}>
-                      Cancel
-                    </Button>
-                  </div>
+                {/* Order Timeline */}
+                <div>
+                  <p className="text-muted-foreground mb-3">Order Progress</p>
+                  <OrderTimeline status={selectedOrder.status || "pending"} />
                 </div>
+
+                {/* Status Update Actions */}
+                {selectedOrder.status !== "delivered" && selectedOrder.status !== "cancelled" && (
+                  <div className="space-y-3 pt-4 border-t">
+                    <p className="text-muted-foreground text-sm font-medium">Update Status</p>
+                    <div className="flex flex-col gap-2">
+                      {getNextStatus(selectedOrder.status || "pending") && (
+                        <Button 
+                          size="sm" 
+                          className="w-full bg-primary hover:bg-primary/90"
+                          onClick={() => updateOrderStatus(selectedOrder.id, getNextStatus(selectedOrder.status || "pending")!)}
+                        >
+                          {selectedOrder.status === "pending" && <CheckCircle2 className="w-4 h-4 mr-2" />}
+                          {selectedOrder.status === "accepted" && <Truck className="w-4 h-4 mr-2" />}
+                          {selectedOrder.status === "out_for_delivery" && <Package className="w-4 h-4 mr-2" />}
+                          {getNextStatusLabel(selectedOrder.status || "pending")}
+                        </Button>
+                      )}
+                      <Button 
+                        size="sm" 
+                        variant="destructive" 
+                        className="w-full"
+                        onClick={() => updateOrderStatus(selectedOrder.id, "cancelled")}
+                      >
+                        Cancel Order
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </DialogContent>
