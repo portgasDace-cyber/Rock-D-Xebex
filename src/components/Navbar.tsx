@@ -1,6 +1,7 @@
 import { ShoppingCart, User, Menu, Shield } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import beeMascot from "@/assets/bee-mascot.png";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,31 +18,33 @@ const Navbar = () => {
   const [cartCount, setCartCount] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
   const [profileName, setProfileName] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  const fetchProfile = async (userId: string) => {
+    // Check admin role
+    const { data: roleData } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .eq("role", "admin")
+      .maybeSingle();
+    setIsAdmin(!!roleData);
+
+    // Get profile
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("full_name, avatar_url")
+      .eq("user_id", userId)
+      .maybeSingle();
+    setProfileName(profileData?.full_name || null);
+    setAvatarUrl(profileData?.avatar_url || null);
+  };
 
   useEffect(() => {
-    const checkAdminAndProfile = async (userId: string) => {
-      // Check admin role
-      const { data: roleData } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", userId)
-        .eq("role", "admin")
-        .maybeSingle();
-      setIsAdmin(!!roleData);
-
-      // Get profile name
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("full_name")
-        .eq("user_id", userId)
-        .maybeSingle();
-      setProfileName(profileData?.full_name || null);
-    };
-
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
-        checkAdminAndProfile(session.user.id);
+        fetchProfile(session.user.id);
       }
     });
 
@@ -50,15 +53,25 @@ const Navbar = () => {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       if (session?.user) {
-        setTimeout(() => checkAdminAndProfile(session.user.id), 0);
+        setTimeout(() => fetchProfile(session.user.id), 0);
       } else {
         setIsAdmin(false);
         setProfileName(null);
+        setAvatarUrl(null);
       }
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
+    // Listen for profile updates
+    const handleProfileUpdate = () => {
+      if (user?.id) fetchProfile(user.id);
+    };
+    window.addEventListener("profileUpdate", handleProfileUpdate);
+
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener("profileUpdate", handleProfileUpdate);
+    };
+  }, [user?.id]);
 
   useEffect(() => {
     const cart = JSON.parse(localStorage.getItem("cart") || "[]");
@@ -81,6 +94,19 @@ const Navbar = () => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
+
+  const getInitials = (name: string | null) => {
+    if (!name) return null;
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const displayName = profileName || user?.email?.split("@")[0] || "User";
+
 
   return (
     <nav className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
@@ -118,12 +144,15 @@ const Navbar = () => {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="gap-2">
-                    <User className="h-4 w-4" />
-                    {profileName && (
-                      <span className="hidden sm:inline max-w-[100px] truncate">
-                        {profileName}
-                      </span>
-                    )}
+                    <Avatar className="w-7 h-7">
+                      <AvatarImage src={avatarUrl || undefined} alt={displayName} />
+                      <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                        {getInitials(profileName) || <User className="w-4 h-4" />}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="hidden sm:inline max-w-[100px] truncate">
+                      {displayName}
+                    </span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">

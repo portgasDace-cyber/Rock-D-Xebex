@@ -2,20 +2,20 @@ import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ShoppingBag, Clock, MapPin, Heart } from "lucide-react";
 import BeeAnimation from "@/components/BeeAnimation";
 import Navbar from "@/components/Navbar";
 import DailyOffers from "@/components/DailyOffers";
+import OnboardingGuide from "@/components/OnboardingGuide";
 import beeMascot from "@/assets/bee-mascot.png";
 import { supabase } from "@/integrations/supabase/client";
 
-const GUIDE_SEEN_KEY = "carrybee_user_guide_seen";
+const ONBOARDING_KEY = "carrybee_onboarding_complete";
 
 const Home = () => {
   const [welcomeName, setWelcomeName] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [showGuide, setShowGuide] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -36,12 +36,18 @@ const Home = () => {
 
       setWelcomeName(profile?.full_name || null);
 
-      const seen = localStorage.getItem(GUIDE_SEEN_KEY) === "1";
-      if (!seen) setShowGuide(true);
+      // Check if onboarding is complete
+      const onboardingComplete = localStorage.getItem(ONBOARDING_KEY) === "1";
+      if (!onboardingComplete) setShowOnboarding(true);
     };
 
     load();
   }, []);
+
+  const handleOnboardingComplete = () => {
+    localStorage.setItem(ONBOARDING_KEY, "1");
+    setShowOnboarding(false);
+  };
 
   const features = [
     {
@@ -85,7 +91,7 @@ const Home = () => {
                   {welcomeName ? `Hi, ${welcomeName}!` : "Hi!"}
                 </p>
               </div>
-              <Button variant="outline" size="sm" onClick={() => setShowGuide(true)}>
+              <Button variant="outline" size="sm" onClick={() => setShowOnboarding(true)}>
                 User Guide
               </Button>
             </CardContent>
@@ -183,37 +189,8 @@ const Home = () => {
         </div>
       </footer>
 
-      {/* First-time user guide */}
-      <Dialog
-        open={showGuide}
-        onOpenChange={(open) => {
-          setShowGuide(open);
-          if (!open) localStorage.setItem(GUIDE_SEEN_KEY, "1");
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="font-outfit">How to use Carry Bee</DialogTitle>
-            <DialogDescription>Quick steps for new users.</DialogDescription>
-          </DialogHeader>
-
-          <ol className="space-y-2 text-sm text-muted-foreground list-decimal pl-5">
-            <li>Go to <span className="text-foreground">Stores</span> and open a store.</li>
-            <li>Add products to your cart.</li>
-            <li>Checkout (your saved phone/address is used automatically).</li>
-            <li>Track your order in <span className="text-foreground">My Orders</span>.</li>
-          </ol>
-
-          <div className="pt-4 flex flex-col sm:flex-row gap-2 sm:justify-end">
-            <Link to="/profile" className="sm:mr-auto">
-              <Button variant="outline" className="w-full sm:w-auto">Edit Profile</Button>
-            </Link>
-            <Button className="w-full sm:w-auto" onClick={() => setShowGuide(false)}>
-              Got it
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Interactive Onboarding Guide */}
+      <OnboardingGuide open={showOnboarding} onComplete={handleOnboardingComplete} />
     </div>
   );
 };

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, User, Save } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import AvatarUpload from "@/components/AvatarUpload";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import beeMascot from "@/assets/bee-mascot.png";
@@ -19,6 +20,7 @@ const Profile = () => {
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -45,6 +47,7 @@ const Profile = () => {
         setFullName(profile.full_name || "");
         setPhone(profile.phone || "");
         setAddress(profile.address || "");
+        setAvatarUrl(profile.avatar_url || null);
       }
 
       setLoading(false);
@@ -74,6 +77,8 @@ const Profile = () => {
 
       if (error) throw error;
 
+      // Emit profile update event for navbar
+      window.dispatchEvent(new CustomEvent("profileUpdate"));
       toast.success("Profile saved successfully!");
     } catch (error: any) {
       toast.error(error.message || "Failed to save profile");
@@ -124,6 +129,16 @@ const Profile = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {/* Avatar Upload */}
+              <div className="mb-6">
+                <AvatarUpload
+                  userId={user.id}
+                  avatarUrl={avatarUrl}
+                  fullName={fullName}
+                  onUpload={setAvatarUrl}
+                />
+              </div>
+
               <form onSubmit={handleSave} className="space-y-4">
                 <div>
                   <Label htmlFor="email">Email</Label>
