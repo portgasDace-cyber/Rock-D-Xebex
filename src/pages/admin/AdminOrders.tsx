@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ShoppingCart, MapPin, Phone, ExternalLink, CheckCircle2, Clock, Truck, Package } from "lucide-react";
+import { ShoppingCart, MapPin, Phone, ExternalLink, CheckCircle2, Clock, Truck, Package, Bell } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -18,6 +18,7 @@ interface OrderData {
   status: string;
   delivery_address: string;
   phone: string;
+  user_id: string;
   latitude: number | null;
   longitude: number | null;
   stores?: { name: string };
@@ -34,6 +35,7 @@ const AdminOrders = () => {
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<OrderData | null>(null);
   const [filter, setFilter] = useState<string>("all");
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   const fetchOrders = async () => {
     let query = supabase
@@ -52,18 +54,82 @@ const AdminOrders = () => {
     setLoading(false);
   };
 
+  // Real-time subscription for orders
   useEffect(() => {
     fetchOrders();
+
+    const channel = supabase
+      .channel('admin-orders-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+        },
+        (payload) => {
+          console.log('Order change received:', payload);
+          
+          if (payload.eventType === 'INSERT') {
+            toast.success("New order received!", {
+              description: `Order #${(payload.new as OrderData).id.slice(0, 8)}`,
+              icon: <Bell className="w-4 h-4" />,
+            });
+          }
+          
+          // Refetch to get complete order data with relations
+          fetchOrders();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [filter]);
 
+  const sendStatusNotification = async (order: OrderData, newStatus: string) => {
+    try {
+      // Use edge function to handle notification - it will fetch user email server-side
+      const { error } = await supabase.functions.invoke('send-order-status-notification', {
+        body: {
+          orderId: order.id,
+          userId: order.user_id,
+          customerPhone: order.phone,
+          storeName: order.stores?.name || "Store",
+          newStatus,
+          totalAmount: order.total_amount,
+        },
+      });
+
+      if (error) {
+        console.error("Failed to send notification:", error);
+      } else {
+        console.log("Status notification sent successfully");
+      }
+    } catch (err) {
+      console.error("Error sending notification:", err);
+    }
+  };
+
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    setUpdatingStatus(true);
     const { error } = await supabase.from("orders").update({ status: newStatus }).eq("id", orderId);
+    
     if (error) {
       toast.error("Failed to update order status");
+      setUpdatingStatus(false);
       return;
     }
-    toast.success(`Order marked as ${newStatus}`);
-    fetchOrders();
+
+    // Send email notification to customer
+    const order = orders.find(o => o.id === orderId);
+    if (order) {
+      sendStatusNotification(order, newStatus);
+    }
+
+    toast.success(`Order marked as ${newStatus.replace(/_/g, " ")}`);
+    setUpdatingStatus(false);
     setSelectedOrder(null);
   };
 
@@ -261,18 +327,29 @@ const AdminOrders = () => {
                         <Button 
                           size="sm" 
                           className="w-full bg-primary hover:bg-primary/90"
+                          disabled={updatingStatus}
                           onClick={() => updateOrderStatus(selectedOrder.id, getNextStatus(selectedOrder.status || "pending")!)}
                         >
-                          {selectedOrder.status === "pending" && <CheckCircle2 className="w-4 h-4 mr-2" />}
-                          {selectedOrder.status === "accepted" && <Truck className="w-4 h-4 mr-2" />}
-                          {selectedOrder.status === "out_for_delivery" && <Package className="w-4 h-4 mr-2" />}
-                          {getNextStatusLabel(selectedOrder.status || "pending")}
+                          {updatingStatus ? (
+                            <span className="flex items-center gap-2">
+                              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              Updating...
+                            </span>
+                          ) : (
+                            <>
+                              {selectedOrder.status === "pending" && <CheckCircle2 className="w-4 h-4 mr-2" />}
+                              {selectedOrder.status === "accepted" && <Truck className="w-4 h-4 mr-2" />}
+                              {selectedOrder.status === "out_for_delivery" && <Package className="w-4 h-4 mr-2" />}
+                              {getNextStatusLabel(selectedOrder.status || "pending")}
+                            </>
+                          )}
                         </Button>
                       )}
                       <Button 
                         size="sm" 
                         variant="destructive" 
                         className="w-full"
+                        disabled={updatingStatus}
                         onClick={() => updateOrderStatus(selectedOrder.id, "cancelled")}
                       >
                         Cancel Order
