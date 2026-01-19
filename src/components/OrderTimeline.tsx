@@ -8,7 +8,7 @@ interface OrderTimelineProps {
 
 const STATUSES = [
   { key: "pending", label: "Pending", icon: Clock },
-  { key: "confirmed", label: "Accepted", icon: Package },
+  { key: "accepted", label: "Accepted", icon: Package },
   { key: "out_for_delivery", label: "Out for Delivery", icon: Truck },
   { key: "delivered", label: "Delivered", icon: CheckCircle2 },
 ];

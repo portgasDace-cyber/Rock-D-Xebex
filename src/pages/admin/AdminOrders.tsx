@@ -1,15 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ShoppingCart, MapPin, Phone, ExternalLink, CheckCircle2, Clock, Truck, Package, Bell } from "lucide-react";
+import { ShoppingCart, MapPin, Phone, ExternalLink, CheckCircle2, Clock, Truck, Package, Bell, Volume2, VolumeX } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import OrderTimeline from "@/components/OrderTimeline";
+import DeliveryLocationMap from "@/components/DeliveryLocationMap";
+import { useOrderSound } from "@/hooks/useOrderSound";
 
 interface OrderData {
   id: string;
@@ -21,6 +23,9 @@ interface OrderData {
   user_id: string;
   latitude: number | null;
   longitude: number | null;
+  delivery_lat: number | null;
+  delivery_lng: number | null;
+  delivery_updated_at: string | null;
   stores?: { name: string };
   order_items?: Array<{
     id: string;
@@ -36,6 +41,8 @@ const AdminOrders = () => {
   const [selectedOrder, setSelectedOrder] = useState<OrderData | null>(null);
   const [filter, setFilter] = useState<string>("all");
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const { playNotificationSound } = useOrderSound();
 
   const fetchOrders = async () => {
     let query = supabase
@@ -71,9 +78,15 @@ const AdminOrders = () => {
           console.log('Order change received:', payload);
           
           if (payload.eventType === 'INSERT') {
-            toast.success("New order received!", {
+            // Play sound alert for new orders
+            if (soundEnabled) {
+              playNotificationSound();
+            }
+            
+            toast.success("🔔 New order received!", {
               description: `Order #${(payload.new as OrderData).id.slice(0, 8)}`,
               icon: <Bell className="w-4 h-4" />,
+              duration: 8000,
             });
           }
           
@@ -86,7 +99,7 @@ const AdminOrders = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [filter]);
+  }, [filter, soundEnabled, playNotificationSound]);
 
   const sendStatusNotification = async (order: OrderData, newStatus: string) => {
     try {
@@ -179,25 +192,46 @@ const AdminOrders = () => {
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-3xl font-outfit font-bold">Orders</h1>
             <p className="text-muted-foreground">Manage and track all orders</p>
           </div>
 
-          <Select value={filter} onValueChange={setFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Orders</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="accepted">Accepted</SelectItem>
-              <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
-              <SelectItem value="delivered">Delivered</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              className="flex items-center gap-2"
+            >
+              {soundEnabled ? (
+                <>
+                  <Volume2 className="w-4 h-4" />
+                  <span className="hidden sm:inline">Sound On</span>
+                </>
+              ) : (
+                <>
+                  <VolumeX className="w-4 h-4" />
+                  <span className="hidden sm:inline">Sound Off</span>
+                </>
+              )}
+            </Button>
+
+            <Select value={filter} onValueChange={setFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Orders</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="accepted">Accepted</SelectItem>
+                <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
+                <SelectItem value="delivered">Delivered</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <Card>
@@ -317,6 +351,21 @@ const AdminOrders = () => {
                   <p className="text-muted-foreground mb-3">Order Progress</p>
                   <OrderTimeline status={selectedOrder.status || "pending"} />
                 </div>
+
+                {/* Delivery Location Update (for out_for_delivery orders) */}
+                {(selectedOrder.status === "out_for_delivery" || selectedOrder.status === "accepted") && (
+                  <div className="pt-4 border-t">
+                    <DeliveryLocationMap
+                      orderId={selectedOrder.id}
+                      deliveryLat={selectedOrder.delivery_lat}
+                      deliveryLng={selectedOrder.delivery_lng}
+                      customerLat={selectedOrder.latitude}
+                      customerLng={selectedOrder.longitude}
+                      isAdmin={true}
+                      onLocationUpdated={fetchOrders}
+                    />
+                  </div>
+                )}
 
                 {/* Status Update Actions */}
                 {selectedOrder.status !== "delivered" && selectedOrder.status !== "cancelled" && (

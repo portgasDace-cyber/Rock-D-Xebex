@@ -93,6 +93,9 @@ export type Database = {
         Row: {
           created_at: string | null
           delivery_address: string
+          delivery_lat: number | null
+          delivery_lng: number | null
+          delivery_updated_at: string | null
           id: string
           latitude: number | null
           longitude: number | null
@@ -105,6 +108,9 @@ export type Database = {
         Insert: {
           created_at?: string | null
           delivery_address: string
+          delivery_lat?: number | null
+          delivery_lng?: number | null
+          delivery_updated_at?: string | null
           id?: string
           latitude?: number | null
           longitude?: number | null
@@ -117,6 +123,9 @@ export type Database = {
         Update: {
           created_at?: string | null
           delivery_address?: string
+          delivery_lat?: number | null
+          delivery_lng?: number | null
+          delivery_updated_at?: string | null
           id?: string
           latitude?: number | null
           longitude?: number | null
