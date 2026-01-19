@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
-import { MapPin, Package } from "lucide-react";
+import { MapPin, Package, ChevronDown, ChevronUp } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import OrderTimeline from "@/components/OrderTimeline";
+import DeliveryLocationMap from "@/components/DeliveryLocationMap";
+import { Button } from "@/components/ui/button";
 
 interface Order {
   id: string;
@@ -15,6 +17,9 @@ interface Order {
   created_at: string;
   latitude: number | null;
   longitude: number | null;
+  delivery_lat: number | null;
+  delivery_lng: number | null;
+  delivery_updated_at: string | null;
   stores: {
     name: string;
   };
@@ -25,6 +30,7 @@ const Orders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -39,6 +45,28 @@ const Orders = () => {
   useEffect(() => {
     if (user) {
       fetchOrders();
+
+      // Subscribe to real-time order updates for the current user
+      const channel = supabase
+        .channel('user-orders-realtime')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'orders',
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            console.log('Order update received:', payload);
+            fetchOrders();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [user]);
 
@@ -59,6 +87,9 @@ const Orders = () => {
     setLoading(false);
   };
 
+  const toggleOrderExpand = (orderId: string) => {
+    setExpandedOrder(expandedOrder === orderId ? null : orderId);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -132,6 +163,41 @@ const Orders = () => {
                     <OrderTimeline status={order.status} />
                   </div>
 
+                  {/* Delivery Tracking Map for out_for_delivery orders */}
+                  {order.status === "out_for_delivery" && (
+                    <div className="pt-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleOrderExpand(order.id)}
+                        className="w-full flex items-center justify-between text-primary"
+                      >
+                        <span className="flex items-center gap-2">
+                          <MapPin className="w-4 h-4" />
+                          Track Delivery Partner
+                        </span>
+                        {expandedOrder === order.id ? (
+                          <ChevronUp className="w-4 h-4" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4" />
+                        )}
+                      </Button>
+
+                      {expandedOrder === order.id && (
+                        <div className="mt-3 animate-fade-in">
+                          <DeliveryLocationMap
+                            orderId={order.id}
+                            deliveryLat={order.delivery_lat}
+                            deliveryLng={order.delivery_lng}
+                            customerLat={order.latitude}
+                            customerLng={order.longitude}
+                            isAdmin={false}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-border/50">
                     <p className="text-sm text-muted-foreground truncate max-w-xs">
                       {order.delivery_address}
@@ -144,7 +210,7 @@ const Orders = () => {
                         className="inline-flex items-center gap-1 text-xs text-primary hover:underline shrink-0"
                       >
                         <MapPin className="w-3 h-3" />
-                        View on Map
+                        View Delivery Location
                       </a>
                     )}
                   </div>
