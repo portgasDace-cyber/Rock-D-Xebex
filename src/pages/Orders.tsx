@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
-import { MapPin, Package, ChevronDown, ChevronUp } from "lucide-react";
+import { MapPin, Package, ChevronDown, ChevronUp, Clock } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import OrderTimeline from "@/components/OrderTimeline";
 import DeliveryLocationMap from "@/components/DeliveryLocationMap";
 import { Button } from "@/components/ui/button";
+import { getDeliveryEta } from "@/utils/deliveryEta";
 
 interface Order {
   id: string;
@@ -166,6 +167,29 @@ const Orders = () => {
                   {/* Delivery Tracking Map for out_for_delivery orders */}
                   {order.status === "out_for_delivery" && (
                     <div className="pt-2">
+                      {/* ETA Display */}
+                      {(() => {
+                        const etaInfo = getDeliveryEta(
+                          order.delivery_lat,
+                          order.delivery_lng,
+                          order.latitude,
+                          order.longitude
+                        );
+                        if (etaInfo) {
+                          return (
+                            <div className="flex items-center gap-2 mb-3 p-3 rounded-lg bg-primary/10 border border-primary/20">
+                              <Clock className="w-5 h-5 text-primary" />
+                              <div>
+                                <p className="font-semibold text-sm">Estimated Arrival: {etaInfo.eta}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  Delivery partner is {etaInfo.distance} km away
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                       <Button
                         variant="ghost"
                         size="sm"

@@ -8,9 +8,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Pencil, Trash2, Package } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, Percent } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
 
 interface ProductData {
   id: string;
@@ -21,6 +22,9 @@ interface ProductData {
   image_url: string | null;
   in_stock: boolean | null;
   store_id: string;
+  offer_percentage: number | null;
+  offer_price: number | null;
+  offer_active: boolean | null;
   stores?: { name: string };
 }
 
@@ -43,6 +47,8 @@ const AdminProducts = () => {
     image_url: "",
     store_id: "",
     in_stock: true,
+    offer_percentage: "",
+    offer_active: false,
   });
 
   const fetchProducts = async () => {
@@ -75,6 +81,8 @@ const AdminProducts = () => {
       image_url: "",
       store_id: "",
       in_stock: true,
+      offer_percentage: "",
+      offer_active: false,
     });
     setEditingProduct(null);
   };
@@ -89,6 +97,8 @@ const AdminProducts = () => {
       image_url: product.image_url || "",
       store_id: product.store_id,
       in_stock: product.in_stock ?? true,
+      offer_percentage: product.offer_percentage?.toString() || "",
+      offer_active: product.offer_active ?? false,
     });
     setDialogOpen(true);
   };
@@ -96,14 +106,23 @@ const AdminProducts = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const offerPercentage = formData.offer_percentage ? parseInt(formData.offer_percentage) : null;
+    const price = parseFloat(formData.price);
+    const offerPrice = offerPercentage && formData.offer_active 
+      ? Math.round(price * (1 - offerPercentage / 100) * 100) / 100 
+      : null;
+
     const productData = {
       name: formData.name,
       description: formData.description || null,
-      price: parseFloat(formData.price),
+      price,
       category: formData.category || null,
       image_url: formData.image_url || null,
       store_id: formData.store_id,
       in_stock: formData.in_stock,
+      offer_percentage: offerPercentage,
+      offer_price: offerPrice,
+      offer_active: formData.offer_active,
     };
 
     if (editingProduct) {
@@ -203,6 +222,37 @@ const AdminProducts = () => {
                   />
                   <Label htmlFor="in_stock">In Stock</Label>
                 </div>
+                <div className="border-t pt-4 mt-2">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Percent className="w-4 h-4 text-primary" />
+                      <Label>Product Offer</Label>
+                    </div>
+                    <Switch
+                      checked={formData.offer_active}
+                      onCheckedChange={(checked) => setFormData({ ...formData, offer_active: checked })}
+                    />
+                  </div>
+                  {formData.offer_active && (
+                    <div>
+                      <Label htmlFor="offer_percentage">Discount Percentage (%)</Label>
+                      <Input
+                        id="offer_percentage"
+                        type="number"
+                        min="1"
+                        max="99"
+                        placeholder="e.g., 10"
+                        value={formData.offer_percentage}
+                        onChange={(e) => setFormData({ ...formData, offer_percentage: e.target.value })}
+                      />
+                      {formData.offer_percentage && formData.price && (
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Offer price: ₹{(parseFloat(formData.price) * (1 - parseInt(formData.offer_percentage) / 100)).toFixed(2)}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
                 <Button type="submit" className="w-full">{editingProduct ? "Update Product" : "Create Product"}</Button>
               </form>
             </DialogContent>
@@ -226,6 +276,7 @@ const AdminProducts = () => {
                     <TableHead>Store</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead>Price</TableHead>
+                    <TableHead>Offer</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -236,7 +287,25 @@ const AdminProducts = () => {
                       <TableCell className="font-medium">{product.name}</TableCell>
                       <TableCell>{product.stores?.name || "-"}</TableCell>
                       <TableCell>{product.category || "-"}</TableCell>
-                      <TableCell className="font-bold text-primary">₹{product.price}</TableCell>
+                      <TableCell>
+                        {product.offer_active && product.offer_price ? (
+                          <div>
+                            <span className="line-through text-muted-foreground text-sm">₹{product.price}</span>
+                            <span className="font-bold text-primary ml-2">₹{product.offer_price}</span>
+                          </div>
+                        ) : (
+                          <span className="font-bold text-primary">₹{product.price}</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {product.offer_active && product.offer_percentage ? (
+                          <span className="px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-700">
+                            {product.offer_percentage}% OFF
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">-</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <span className={`px-2 py-1 rounded-full text-xs ${product.in_stock ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
                           {product.in_stock ? "In Stock" : "Out of Stock"}
