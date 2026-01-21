@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Star, Clock, MapPin, ArrowLeft, Plus, Minus } from "lucide-react";
+import { Star, Clock, MapPin, ArrowLeft, Plus, Minus, Percent } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import ProductRequestForm from "@/components/ProductRequestForm";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,6 +18,9 @@ interface Product {
   image_url: string;
   category: string;
   in_stock: boolean;
+  offer_percentage: number | null;
+  offer_price: number | null;
+  offer_active: boolean | null;
 }
 
 interface Store {
@@ -83,8 +86,13 @@ const StoreDetail = () => {
         toast.success(`${product.name} removed from cart`);
       }
     } else if (change > 0) {
+      const effectivePrice = product.offer_active && product.offer_price 
+        ? product.offer_price 
+        : product.price;
       newCart.push({
         ...product,
+        price: effectivePrice,
+        originalPrice: product.price,
         quantity: 1,
         storeId: id,
         storeName: store?.name,
@@ -201,6 +209,12 @@ const StoreDetail = () => {
                     alt={product.name}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                   />
+                  {product.offer_active && product.offer_percentage && (
+                    <div className="absolute top-2 right-2 bg-destructive text-destructive-foreground px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+                      <Percent className="w-3 h-3" />
+                      {product.offer_percentage}% OFF
+                    </div>
+                  )}
                   {!product.in_stock && (
                     <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                       <Badge variant="destructive">Out of Stock</Badge>
@@ -221,9 +235,22 @@ const StoreDetail = () => {
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-lg font-bold text-primary">
-                      ₹{product.price}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {product.offer_active && product.offer_price ? (
+                        <>
+                          <span className="text-sm text-muted-foreground line-through">
+                            ₹{product.price}
+                          </span>
+                          <span className="text-lg font-bold text-primary">
+                            ₹{product.offer_price}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-lg font-bold text-primary">
+                          ₹{product.price}
+                        </span>
+                      )}
+                    </div>
 
                     {product.in_stock && (
                       <div className="flex items-center gap-2">

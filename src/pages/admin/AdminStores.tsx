@@ -22,6 +22,8 @@ interface StoreData {
   image_url: string | null;
   latitude: number | null;
   longitude: number | null;
+  opening_time: string | null;
+  closing_time: string | null;
 }
 
 const AdminStores = () => {
@@ -38,6 +40,8 @@ const AdminStores = () => {
     image_url: "",
     latitude: "",
     longitude: "",
+    opening_time: "07:00",
+    closing_time: "22:00",
   });
 
   const fetchStores = async () => {
@@ -62,6 +66,8 @@ const AdminStores = () => {
       image_url: "",
       latitude: "",
       longitude: "",
+      opening_time: "07:00",
+      closing_time: "22:00",
     });
     setEditingStore(null);
   };
@@ -77,6 +83,8 @@ const AdminStores = () => {
       image_url: store.image_url || "",
       latitude: store.latitude?.toString() || "",
       longitude: store.longitude?.toString() || "",
+      opening_time: store.opening_time || "07:00",
+      closing_time: store.closing_time || "22:00",
     });
     setDialogOpen(true);
   };
@@ -93,6 +101,8 @@ const AdminStores = () => {
       image_url: formData.image_url || null,
       latitude: formData.latitude ? parseFloat(formData.latitude) : null,
       longitude: formData.longitude ? parseFloat(formData.longitude) : null,
+      opening_time: formData.opening_time || "07:00",
+      closing_time: formData.closing_time || "22:00",
     };
 
     if (editingStore) {
@@ -181,6 +191,16 @@ const AdminStores = () => {
                   <div>
                     <Label htmlFor="longitude">Longitude</Label>
                     <Input id="longitude" type="number" step="any" value={formData.longitude} onChange={(e) => setFormData({ ...formData, longitude: e.target.value })} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="opening_time">Opening Time</Label>
+                    <Input id="opening_time" type="time" value={formData.opening_time} onChange={(e) => setFormData({ ...formData, opening_time: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label htmlFor="closing_time">Closing Time</Label>
+                    <Input id="closing_time" type="time" value={formData.closing_time} onChange={(e) => setFormData({ ...formData, closing_time: e.target.value })} />
                   </div>
                 </div>
                 <Button type="submit" className="w-full">{editingStore ? "Update Store" : "Create Store"}</Button>

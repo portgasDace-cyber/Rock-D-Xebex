@@ -192,6 +192,9 @@ export type Database = {
           image_url: string | null
           in_stock: boolean | null
           name: string
+          offer_active: boolean | null
+          offer_percentage: number | null
+          offer_price: number | null
           price: number
           store_id: string
         }
@@ -203,6 +206,9 @@ export type Database = {
           image_url?: string | null
           in_stock?: boolean | null
           name: string
+          offer_active?: boolean | null
+          offer_percentage?: number | null
+          offer_price?: number | null
           price: number
           store_id: string
         }
@@ -214,6 +220,9 @@ export type Database = {
           image_url?: string | null
           in_stock?: boolean | null
           name?: string
+          offer_active?: boolean | null
+          offer_percentage?: number | null
+          offer_price?: number | null
           price?: number
           store_id?: string
         }
@@ -264,6 +273,7 @@ export type Database = {
         Row: {
           address: string | null
           category: string
+          closing_time: string | null
           created_at: string | null
           delivery_time: string | null
           id: string
@@ -272,12 +282,14 @@ export type Database = {
           latitude: number | null
           longitude: number | null
           name: string
+          opening_time: string | null
           phone: string | null
           rating: number | null
         }
         Insert: {
           address?: string | null
           category: string
+          closing_time?: string | null
           created_at?: string | null
           delivery_time?: string | null
           id?: string
@@ -286,12 +298,14 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           name: string
+          opening_time?: string | null
           phone?: string | null
           rating?: number | null
         }
         Update: {
           address?: string | null
           category?: string
+          closing_time?: string | null
           created_at?: string | null
           delivery_time?: string | null
           id?: string
@@ -300,6 +314,7 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           name?: string
+          opening_time?: string | null
           phone?: string | null
           rating?: number | null
         }
