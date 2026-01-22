@@ -6,6 +6,7 @@ import { ShoppingBag, Clock, MapPin, Heart } from "lucide-react";
 import BeeAnimation from "@/components/BeeAnimation";
 import Navbar from "@/components/Navbar";
 import DailyOffers from "@/components/DailyOffers";
+import OffersSection from "@/components/OffersSection";
 import OnboardingGuide from "@/components/OnboardingGuide";
 import beeMascot from "@/assets/bee-mascot.png";
 import { supabase } from "@/integrations/supabase/client";
@@ -79,6 +80,9 @@ const Home = () => {
 
       {/* Daily Offers Section */}
       <DailyOffers />
+
+      {/* Product Offers Section */}
+      <OffersSection />
 
       {/* Welcome banner */}
       {isLoggedIn && (

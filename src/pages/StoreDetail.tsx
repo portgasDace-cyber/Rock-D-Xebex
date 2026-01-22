@@ -9,6 +9,7 @@ import ProductRequestForm from "@/components/ProductRequestForm";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { formatStoreTime, isStoreOpenNow } from "@/utils/storeHours";
 
 interface Product {
   id: string;
@@ -33,6 +34,8 @@ interface Store {
   rating: number;
   delivery_time: string;
   is_open: boolean;
+  opening_time?: string | null;
+  closing_time?: string | null;
 }
 
 const StoreDetail = () => {
@@ -76,6 +79,11 @@ const StoreDetail = () => {
   };
 
   const updateCart = (product: Product, change: number) => {
+    if (!store || !isStoreOpenNow(store)) {
+      toast.error("Store is currently closed. Ordering is paused.");
+      return;
+    }
+
     const newCart = [...cart];
     const existingIndex = newCart.findIndex((item) => item.id === product.id);
 
@@ -136,6 +144,10 @@ const StoreDetail = () => {
     );
   }
 
+  const storeOpenNow = isStoreOpenNow(store);
+  const opening = formatStoreTime(store.opening_time) ?? "—";
+  const closing = formatStoreTime(store.closing_time) ?? "—";
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -173,6 +185,12 @@ const StoreDetail = () => {
                 <Badge className="bg-primary text-primary-foreground capitalize">
                   {store.category}
                 </Badge>
+                <Badge
+                  variant={storeOpenNow ? "secondary" : "destructive"}
+                  className={storeOpenNow ? "bg-primary/20 text-primary" : undefined}
+                >
+                  {storeOpenNow ? "Open now" : "Closed"}
+                </Badge>
               </div>
             </div>
           </div>
@@ -183,8 +201,13 @@ const StoreDetail = () => {
             </div>
             <div className="flex items-center gap-2 text-sm">
               <Clock className="w-4 h-4 text-primary" />
-              <span className="text-foreground font-medium">Opening Hours: 7:00 AM - 10:00 PM</span>
+              <span className="text-foreground font-medium">Opening Hours: {opening} - {closing}</span>
             </div>
+            {!storeOpenNow && (
+              <p className="text-sm text-muted-foreground">
+                This store is currently closed. You can browse items, but adding to cart is disabled.
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -259,6 +282,7 @@ const StoreDetail = () => {
                             size="sm"
                             onClick={() => updateCart(product, 1)}
                             className="gap-1"
+                            disabled={!storeOpenNow}
                           >
                             <Plus className="w-4 h-4" />
                             Add
@@ -270,6 +294,7 @@ const StoreDetail = () => {
                               variant="ghost"
                               className="h-7 w-7"
                               onClick={() => updateCart(product, -1)}
+                              disabled={!storeOpenNow}
                             >
                               <Minus className="w-4 h-4" />
                             </Button>
@@ -281,6 +306,7 @@ const StoreDetail = () => {
                               variant="ghost"
                               className="h-7 w-7"
                               onClick={() => updateCart(product, 1)}
+                              disabled={!storeOpenNow}
                             >
                               <Plus className="w-4 h-4" />
                             </Button>
