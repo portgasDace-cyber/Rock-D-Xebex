@@ -11,6 +11,7 @@ import Navbar from "@/components/Navbar";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import paymentQR from "@/assets/payment-qr.jpeg";
+import { isStoreOpenNow } from "@/utils/storeHours";
 
 // Calculate distance between two points using Haversine formula (returns km)
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -186,36 +187,68 @@ const Cart = () => {
   };
 
   const handleProceedToPayment = () => {
-    if (!user) {
-      toast.error("Please login to place an order");
-      navigate("/auth");
-      return;
-    }
+    // Prevent orders when a store is closed
+    const ensureStoresOpen = async () => {
+      const storeIds = Array.from(new Set(cart.map((i) => i.storeId).filter(Boolean)));
+      if (storeIds.length === 0) return { ok: true as const };
 
-    if (!address || !phone) {
-      toast.error("Please fill in all delivery details");
-      return;
-    }
+      const { data, error } = await supabase
+        .from("stores")
+        .select("id,name,opening_time,closing_time,is_open")
+        .in("id", storeIds);
 
-    if (!location) {
-      toast.error("Please share your location for delivery");
-      return;
-    }
+      if (error || !data) return { ok: true as const }; // fail-open (don’t block due to fetch issues)
 
-    if (cart.length === 0) {
-      toast.error("Your cart is empty");
-      return;
-    }
+      const closed = data.filter((s) => !isStoreOpenNow(s));
+      if (closed.length === 0) return { ok: true as const };
 
-    // Open UPI payment link with amount
-    const totalAmount = getTotalAmount() + deliveryFee;
-    const upiId = "9787141556-1@okbizaxis";
-    const payeeName = "Kunnathur Carry Bee";
-    const upiLink = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${totalAmount}&cu=INR`;
-    
-    // Try to open UPI app, then show modal
-    window.open(upiLink, "_blank");
-    setShowPaymentModal(true);
+      return {
+        ok: false as const,
+        names: closed.map((s) => s.name).slice(0, 3),
+      };
+    };
+
+    // Wrap the existing sync handler flow
+    const run = async () => {
+      const res = await ensureStoresOpen();
+      if (!res.ok) {
+        toast.error(`Store closed: ${res.names.join(", ")}. Please try again later.`);
+        return;
+      }
+
+      if (!user) {
+        toast.error("Please login to place an order");
+        navigate("/auth");
+        return;
+      }
+
+      if (!address || !phone) {
+        toast.error("Please fill in all delivery details");
+        return;
+      }
+
+      if (!location) {
+        toast.error("Please share your location for delivery");
+        return;
+      }
+
+      if (cart.length === 0) {
+        toast.error("Your cart is empty");
+        return;
+      }
+
+      // Open UPI payment link with amount
+      const totalAmount = getTotalAmount() + deliveryFee;
+      const upiId = "9787141556-1@okbizaxis";
+      const payeeName = "Kunnathur Carry Bee";
+      const upiLink = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}&am=${totalAmount}&cu=INR`;
+
+      // Try to open UPI app, then show modal
+      window.open(upiLink, "_blank");
+      setShowPaymentModal(true);
+    };
+
+    void run();
   };
 
   const handleConfirmPayment = async () => {
