@@ -8,6 +8,7 @@ import Navbar from "@/components/Navbar";
 import DailyOffers from "@/components/DailyOffers";
 import OffersSection from "@/components/OffersSection";
 import OnboardingGuide from "@/components/OnboardingGuide";
+import { PushNotificationPrompt } from "@/components/PushNotificationPrompt";
 import beeMascot from "@/assets/bee-mascot.png";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -195,6 +196,9 @@ const Home = () => {
 
       {/* Interactive Onboarding Guide */}
       <OnboardingGuide open={showOnboarding} onComplete={handleOnboardingComplete} />
+
+      {/* Push Notification Prompt */}
+      <PushNotificationPrompt />
     </div>
   );
 };
