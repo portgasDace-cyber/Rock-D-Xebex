@@ -1,7 +1,8 @@
 import { Store, Package, ShoppingCart, BarChart3, Home, LogOut, Sparkles } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
+import { signOut } from "firebase/auth";
+import { auth } from "@/integrations/firebase/config";
 import { toast } from "sonner";
 import beeMascot from "@/assets/bee-mascot.png";
 
@@ -17,7 +18,7 @@ export const AdminSidebar = () => {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await signOut(auth);
     toast.success("Logged out successfully");
     navigate("/");
   };

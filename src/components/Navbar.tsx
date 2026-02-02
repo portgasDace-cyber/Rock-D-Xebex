@@ -5,6 +5,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import beeMascot from "@/assets/bee-mascot.png";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { onAuthStateChanged, User as FirebaseUser, signOut } from "firebase/auth";
+import { auth } from "@/integrations/firebase/config";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,7 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 const Navbar = () => {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<FirebaseUser | null>(null);
   const [cartCount, setCartCount] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
   const [profileName, setProfileName] = useState<string | null>(null);
@@ -41,19 +43,10 @@ const Navbar = () => {
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      }
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        setTimeout(() => fetchProfile(session.user.id), 0);
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser);
+      if (firebaseUser) {
+        fetchProfile(firebaseUser.uid);
       } else {
         setIsAdmin(false);
         setProfileName(null);
@@ -63,15 +56,15 @@ const Navbar = () => {
 
     // Listen for profile updates
     const handleProfileUpdate = () => {
-      if (user?.id) fetchProfile(user.id);
+      if (user?.uid) fetchProfile(user.uid);
     };
     window.addEventListener("profileUpdate", handleProfileUpdate);
 
     return () => {
-      subscription.unsubscribe();
+      unsubscribe();
       window.removeEventListener("profileUpdate", handleProfileUpdate);
     };
-  }, [user?.id]);
+  }, [user?.uid]);
 
   useEffect(() => {
     const cart = JSON.parse(localStorage.getItem("cart") || "[]");
@@ -92,7 +85,7 @@ const Navbar = () => {
   }, []);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await signOut(auth);
   };
 
   const getInitials = (name: string | null) => {
@@ -105,7 +98,7 @@ const Navbar = () => {
       .slice(0, 2);
   };
 
-  const displayName = profileName || user?.email?.split("@")[0] || "User";
+  const displayName = profileName || user?.displayName || user?.email?.split("@")[0] || "User";
 
 
   return (
@@ -145,9 +138,9 @@ const Navbar = () => {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="gap-2">
                     <Avatar className="w-7 h-7">
-                      <AvatarImage src={avatarUrl || undefined} alt={displayName} />
+                      <AvatarImage src={user.photoURL || avatarUrl || undefined} alt={displayName} />
                       <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                        {getInitials(profileName) || <User className="w-4 h-4" />}
+                        {getInitials(profileName || user.displayName) || <User className="w-4 h-4" />}
                       </AvatarFallback>
                     </Avatar>
                     <span className="hidden sm:inline max-w-[100px] truncate">

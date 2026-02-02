@@ -7,19 +7,19 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { User } from "@supabase/supabase-js";
+import { User as FirebaseUser } from "firebase/auth";
 import Navbar from "@/components/Navbar";
 import beeMascot from "@/assets/bee-mascot.png";
 
 interface ProfileCompletionProps {
-  user: User;
+  user: FirebaseUser;
   onComplete: () => void;
 }
 
 const ProfileCompletion = ({ user, onComplete }: ProfileCompletionProps) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [fullName, setFullName] = useState(user.user_metadata?.full_name || "");
+  const [fullName, setFullName] = useState(user.displayName || "");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
 
@@ -28,7 +28,7 @@ const ProfileCompletion = ({ user, onComplete }: ProfileCompletionProps) => {
       const { data } = await supabase
         .from("profiles")
         .select("full_name, phone, address")
-        .eq("user_id", user.id)
+        .eq("user_id", user.uid)
         .maybeSingle();
 
       if (data) {
@@ -39,7 +39,7 @@ const ProfileCompletion = ({ user, onComplete }: ProfileCompletionProps) => {
     };
 
     loadExistingProfile();
-  }, [user.id]);
+  }, [user.uid]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,7 +50,7 @@ const ProfileCompletion = ({ user, onComplete }: ProfileCompletionProps) => {
         .from("profiles")
         .upsert(
           {
-            user_id: user.id,
+            user_id: user.uid,
             full_name: fullName || null,
             phone,
             address,

@@ -9,26 +9,27 @@ import { Separator } from "@/components/ui/separator";
 import Navbar from "@/components/Navbar";
 import ProfileCompletion from "@/components/ProfileCompletion";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
+import { useFirebaseAuth } from "@/hooks/useFirebaseAuth";
 import { toast } from "sonner";
-import { User } from "@supabase/supabase-js";
+import { User as FirebaseUser } from "firebase/auth";
 import beeMascot from "@/assets/bee-mascot.png";
 
 const Auth = () => {
   const navigate = useNavigate();
+  const { user: firebaseUser, loading: authLoading, signIn, signUp, signInWithGoogle } = useFirebaseAuth();
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showProfileCompletion, setShowProfileCompletion] = useState(false);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
 
   useEffect(() => {
-    const handleSignedIn = async (signedInUser: User) => {
+    const handleSignedIn = async (signedInUser: FirebaseUser) => {
       const { data: profile, error } = await supabase
         .from("profiles")
         .select("full_name, phone, address")
-        .eq("user_id", signedInUser.id)
+        .eq("user_id", signedInUser.uid)
         .maybeSingle();
 
       // Ensure a profile row exists so upserts/updates always work
@@ -37,8 +38,8 @@ const Auth = () => {
           .from("profiles")
           .upsert(
             {
-              user_id: signedInUser.id,
-              full_name: signedInUser.user_metadata?.full_name ?? null,
+              user_id: signedInUser.uid,
+              full_name: signedInUser.displayName ?? null,
             },
             { onConflict: "user_id" }
           );
@@ -53,50 +54,18 @@ const Auth = () => {
       }
     };
 
-    const checkSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (session?.user) {
-        await handleSignedIn(session.user);
-      }
-    };
-
-    checkSession();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_IN" && session?.user) {
-        await handleSignedIn(session.user);
-      }
-
-      if (event === "SIGNED_OUT") {
-        setShowProfileCompletion(false);
-        setCurrentUser(null);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+    if (!authLoading && firebaseUser) {
+      handleSignedIn(firebaseUser);
+    }
+  }, [firebaseUser, authLoading, navigate]);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth`,
-        },
-      });
-
-      if (error) throw error;
-
-      toast.success("Account created successfully! Please log in.");
+      await signUp(email, password);
+      toast.success("Account created successfully!");
       setEmail("");
       setPassword("");
     } catch (error: any) {
@@ -111,13 +80,7 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-
+      await signIn(email, password);
       toast.success("Welcome back!");
     } catch (error: any) {
       toast.error(error.message || "Failed to sign in");
@@ -130,13 +93,11 @@ const Auth = () => {
     setGoogleLoading(true);
 
     try {
-      const { error } = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: `${window.location.origin}/auth`,
-      });
-
-      if (error) throw error;
+      await signInWithGoogle();
+      toast.success("Signed in with Google!");
     } catch (error: any) {
       toast.error(error.message || "Failed to sign in with Google");
+    } finally {
       setGoogleLoading(false);
     }
   };
