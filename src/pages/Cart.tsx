@@ -9,6 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Plus, Minus, Trash2, ArrowLeft, ShoppingBag, MapPin, Loader2, QrCode, Check } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { supabase } from "@/integrations/supabase/client";
+import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
+import { auth } from "@/integrations/firebase/config";
 import { toast } from "sonner";
 import paymentQR from "@/assets/payment-qr.jpeg";
 import { isStoreOpenNow } from "@/utils/storeHours";
@@ -35,7 +37,7 @@ const calculateDeliveryFee = (distanceKm: number): number => {
 const Cart = () => {
   const navigate = useNavigate();
   const [cart, setCart] = useState<any[]>([]);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<FirebaseUser | null>(null);
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
@@ -105,16 +107,16 @@ const Cart = () => {
     const savedCart = JSON.parse(localStorage.getItem("cart") || "[]");
     setCart(savedCart);
 
-    const fetchUserAndProfile = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
+    // Listen for Firebase auth state
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setUser(firebaseUser);
 
       // Auto-fill from saved profile
-      if (session?.user) {
+      if (firebaseUser) {
         const { data: profile, error } = await supabase
           .from("profiles")
           .select("phone, address")
-          .eq("user_id", session.user.id)
+          .eq("user_id", firebaseUser.uid)
           .maybeSingle();
 
         if (error && error.code !== "PGRST116") {
@@ -126,9 +128,9 @@ const Cart = () => {
           if (profile.address && !address) setAddress(profile.address);
         }
       }
-    };
+    });
 
-    fetchUserAndProfile();
+    return () => unsubscribe();
 
     // Fetch store location for delivery fee calculation
     if (savedCart.length > 0) {
@@ -289,7 +291,7 @@ const Cart = () => {
         const { data: order, error: orderError } = await supabase
           .from("orders")
           .insert({
-            user_id: user.id,
+            user_id: user.uid,
             store_id: storeId,
             total_amount: totalWithDelivery,
             delivery_address: address,

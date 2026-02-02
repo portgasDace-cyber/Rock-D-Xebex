@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { auth } from '@/integrations/firebase/config';
 import { toast } from 'sonner';
 
 const VAPID_PUBLIC_KEY = 'BNwZj3PK0snMznjnaNqV2WGBQ0czntF0aNMAD9uhKHFDpEeBFanzhvWVtHO-R5Xr6tNFdwtLAgxzEggcylUD41A';
@@ -73,15 +74,15 @@ export function usePushNotifications() {
 
       const subscriptionJSON = subscription.toJSON();
 
-      // Get current user (may be null for guests)
-      const { data: { user } } = await supabase.auth.getUser();
+      // Get current user from Firebase (may be null for guests)
+      const user = auth.currentUser;
 
       // Save subscription to database
       const { error } = await supabase.from('push_subscriptions').upsert({
         endpoint: subscriptionJSON.endpoint!,
         p256dh: subscriptionJSON.keys!.p256dh,
         auth: subscriptionJSON.keys!.auth,
-        user_id: user?.id || null,
+        user_id: user?.uid || null,
       }, {
         onConflict: 'endpoint',
       });

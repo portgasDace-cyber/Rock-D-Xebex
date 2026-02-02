@@ -9,6 +9,8 @@ import { Loader2, User, Save } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import AvatarUpload from "@/components/AvatarUpload";
 import { supabase } from "@/integrations/supabase/client";
+import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
+import { auth } from "@/integrations/firebase/config";
 import { toast } from "sonner";
 import beeMascot from "@/assets/bee-mascot.png";
 
@@ -16,27 +18,25 @@ const Profile = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<FirebaseUser | null>(null);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!firebaseUser) {
         navigate("/auth");
         return;
       }
 
-      setUser(session.user);
+      setUser(firebaseUser);
 
       const { data: profile, error } = await supabase
         .from("profiles")
         .select("*")
-        .eq("user_id", session.user.id)
+        .eq("user_id", firebaseUser.uid)
         .maybeSingle();
 
       if (error && error.code !== "PGRST116") {
@@ -51,9 +51,9 @@ const Profile = () => {
       }
 
       setLoading(false);
-    };
+    });
 
-    fetchProfile();
+    return () => unsubscribe();
   }, [navigate]);
 
   const handleSave = async (e: React.FormEvent) => {
@@ -61,13 +61,13 @@ const Profile = () => {
     setSaving(true);
 
     try {
-      if (!user?.id) throw new Error("Not authenticated");
+      if (!user?.uid) throw new Error("Not authenticated");
 
       const { error } = await supabase
         .from("profiles")
         .upsert(
           {
-            user_id: user.id,
+            user_id: user.uid,
             full_name: fullName || null,
             phone,
             address,
@@ -130,14 +130,16 @@ const Profile = () => {
             </CardHeader>
             <CardContent>
               {/* Avatar Upload */}
-              <div className="mb-6">
-                <AvatarUpload
-                  userId={user.id}
-                  avatarUrl={avatarUrl}
-                  fullName={fullName}
-                  onUpload={setAvatarUrl}
-                />
-              </div>
+              {user && (
+                <div className="mb-6">
+                  <AvatarUpload
+                    userId={user.uid}
+                    avatarUrl={avatarUrl}
+                    fullName={fullName}
+                    onUpload={setAvatarUrl}
+                  />
+                </div>
+              )}
 
               <form onSubmit={handleSave} className="space-y-4">
                 <div>

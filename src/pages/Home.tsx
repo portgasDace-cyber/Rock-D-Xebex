@@ -11,6 +11,8 @@ import OnboardingGuide from "@/components/OnboardingGuide";
 import { PushNotificationPrompt } from "@/components/PushNotificationPrompt";
 import beeMascot from "@/assets/bee-mascot.png";
 import { supabase } from "@/integrations/supabase/client";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "@/integrations/firebase/config";
 
 const ONBOARDING_KEY = "carrybee_onboarding_complete";
 
@@ -20,30 +22,26 @@ const Home = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
-    const load = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      const loggedIn = !!session?.user;
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      const loggedIn = !!firebaseUser;
       setIsLoggedIn(loggedIn);
 
-      if (!loggedIn || !session?.user) return;
+      if (!loggedIn || !firebaseUser) return;
 
       const { data: profile } = await supabase
         .from("profiles")
         .select("full_name")
-        .eq("user_id", session.user.id)
+        .eq("user_id", firebaseUser.uid)
         .maybeSingle();
 
-      setWelcomeName(profile?.full_name || null);
+      setWelcomeName(profile?.full_name || firebaseUser.displayName || null);
 
       // Check if onboarding is complete
       const onboardingComplete = localStorage.getItem(ONBOARDING_KEY) === "1";
       if (!onboardingComplete) setShowOnboarding(true);
-    };
+    });
 
-    load();
+    return () => unsubscribe();
   }, []);
 
   const handleOnboardingComplete = () => {
