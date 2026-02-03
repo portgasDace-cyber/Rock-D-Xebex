@@ -36,6 +36,12 @@ const Orders = () => {
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!auth) {
+      console.warn("Firebase auth not initialized");
+      navigate("/auth");
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (!firebaseUser) {
         navigate("/auth");

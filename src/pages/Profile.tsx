@@ -25,6 +25,12 @@ const Profile = () => {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!auth) {
+      console.warn("Firebase auth not initialized");
+      navigate("/auth");
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!firebaseUser) {
         navigate("/auth");

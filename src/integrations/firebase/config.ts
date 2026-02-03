@@ -1,4 +1,4 @@
-import { initializeApp, FirebaseApp } from "firebase/app";
+import { initializeApp, getApp, getApps } from "firebase/app";
 import { getAuth, GoogleAuthProvider, Auth } from "firebase/auth";
 
 const firebaseConfig = {
@@ -13,13 +13,12 @@ const firebaseConfig = {
 // Check if Firebase config is valid
 const isConfigValid = firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId;
 
-let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let googleProvider: GoogleAuthProvider | null = null;
 
 if (isConfigValid) {
   try {
-    app = initializeApp(firebaseConfig);
+    const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
     auth = getAuth(app);
     googleProvider = new GoogleAuthProvider();
   } catch (error) {
