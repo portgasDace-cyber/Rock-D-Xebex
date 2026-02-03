@@ -108,6 +108,11 @@ const Cart = () => {
     setCart(savedCart);
 
     // Listen for Firebase auth state
+    if (!auth) {
+      console.warn("Firebase auth not initialized");
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
 
