@@ -22,6 +22,11 @@ const Home = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
+    if (!auth) {
+      console.warn("Firebase auth not initialized");
+      return;
+    }
+    
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       const loggedIn = !!firebaseUser;
       setIsLoggedIn(loggedIn);

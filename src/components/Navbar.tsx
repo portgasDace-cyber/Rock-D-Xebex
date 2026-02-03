@@ -43,6 +43,8 @@ const Navbar = () => {
   };
 
   useEffect(() => {
+    if (!auth) return;
+    
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       if (firebaseUser) {
@@ -85,7 +87,7 @@ const Navbar = () => {
   }, []);
 
   const handleLogout = async () => {
-    await signOut(auth);
+    if (auth) await signOut(auth);
   };
 
   const getInitials = (name: string | null) => {

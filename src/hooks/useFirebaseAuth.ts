@@ -13,11 +13,20 @@ import { supabase } from "@/integrations/supabase/client";
 export const useFirebaseAuth = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
+    if (!auth) {
+      console.warn("Firebase auth not initialized");
+      setLoading(false);
+      setAuthReady(true);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
       setLoading(false);
+      setAuthReady(true);
 
       // Sync Firebase user with Supabase profiles if needed
       if (firebaseUser) {
@@ -50,24 +59,29 @@ export const useFirebaseAuth = () => {
   };
 
   const signIn = async (email: string, password: string) => {
+    if (!auth) throw new Error("Firebase auth not initialized");
     return signInWithEmailAndPassword(auth, email, password);
   };
 
   const signUp = async (email: string, password: string) => {
+    if (!auth) throw new Error("Firebase auth not initialized");
     return createUserWithEmailAndPassword(auth, email, password);
   };
 
   const signInWithGoogle = async () => {
+    if (!auth || !googleProvider) throw new Error("Firebase auth not initialized");
     return signInWithPopup(auth, googleProvider);
   };
 
   const signOut = async () => {
+    if (!auth) throw new Error("Firebase auth not initialized");
     return firebaseSignOut(auth);
   };
 
   return {
     user,
     loading,
+    authReady,
     signIn,
     signUp,
     signInWithGoogle,
