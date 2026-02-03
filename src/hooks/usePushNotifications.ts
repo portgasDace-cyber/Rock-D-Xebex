@@ -74,8 +74,8 @@ export function usePushNotifications() {
 
       const subscriptionJSON = subscription.toJSON();
 
-      // Get current user from Firebase (may be null for guests)
-      const user = auth.currentUser;
+      // Get current user from Firebase (may be null for guests or if auth not ready)
+      const user = auth?.currentUser;
 
       // Save subscription to database
       const { error } = await supabase.from('push_subscriptions').upsert({

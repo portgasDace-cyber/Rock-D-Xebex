@@ -25,6 +25,11 @@ export const useAdmin = () => {
       setLoading(false);
     };
 
+    if (!auth) {
+      setLoading(false);
+      return;
+    }
+
     // Set up Firebase auth state listener
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
