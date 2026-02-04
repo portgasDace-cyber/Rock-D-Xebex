@@ -4,8 +4,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { MapPin, Package, ChevronDown, ChevronUp, Clock } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { supabase } from "@/integrations/supabase/client";
-import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
-import { auth } from "@/integrations/firebase/config";
 import { Skeleton } from "@/components/ui/skeleton";
 import OrderTimeline from "@/components/OrderTimeline";
 import DeliveryLocationMap from "@/components/DeliveryLocationMap";
@@ -32,25 +30,17 @@ const Orders = () => {
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [user, setUser] = useState<any>(null);
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!auth) {
-      console.warn("Firebase auth not initialized");
-      navigate("/auth");
-      return;
-    }
-
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (!firebaseUser) {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
         navigate("/auth");
       } else {
-        setUser(firebaseUser);
+        setUser(session.user);
       }
     });
-
-    return () => unsubscribe();
   }, [navigate]);
 
   useEffect(() => {
@@ -66,7 +56,7 @@ const Orders = () => {
             event: '*',
             schema: 'public',
             table: 'orders',
-            filter: `user_id=eq.${user.uid}`,
+            filter: `user_id=eq.${user.id}`,
           },
           (payload) => {
             console.log('Order update received:', payload);
@@ -82,8 +72,6 @@ const Orders = () => {
   }, [user]);
 
   const fetchOrders = async () => {
-    if (!user) return;
-    
     setLoading(true);
     const { data, error } = await supabase
       .from("orders")
@@ -91,7 +79,7 @@ const Orders = () => {
         *,
         stores (name)
       `)
-      .eq("user_id", user.uid)
+      .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
     if (!error && data) {

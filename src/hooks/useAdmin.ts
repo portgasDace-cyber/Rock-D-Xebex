@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { User as FirebaseUser, onAuthStateChanged } from "firebase/auth";
-import { auth } from "@/integrations/firebase/config";
+import { User } from "@supabase/supabase-js";
 
 export const useAdmin = () => {
-  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -25,23 +24,32 @@ export const useAdmin = () => {
       setLoading(false);
     };
 
-    if (!auth) {
-      setLoading(false);
-      return;
-    }
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          setTimeout(() => {
+            checkAdmin(session.user.id);
+          }, 0);
+        } else {
+          setIsAdmin(false);
+          setLoading(false);
+        }
+      }
+    );
 
-    // Set up Firebase auth state listener
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
-      if (firebaseUser) {
-        checkAdmin(firebaseUser.uid);
+    // Check existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        checkAdmin(session.user.id);
       } else {
-        setIsAdmin(false);
         setLoading(false);
       }
     });
 
-    return () => unsubscribe();
+    return () => subscription.unsubscribe();
   }, []);
 
   return { user, isAdmin, loading };

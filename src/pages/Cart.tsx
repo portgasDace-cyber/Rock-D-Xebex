@@ -9,8 +9,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Plus, Minus, Trash2, ArrowLeft, ShoppingBag, MapPin, Loader2, QrCode, Check } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { supabase } from "@/integrations/supabase/client";
-import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
-import { auth } from "@/integrations/firebase/config";
 import { toast } from "sonner";
 import paymentQR from "@/assets/payment-qr.jpeg";
 import { isStoreOpenNow } from "@/utils/storeHours";
@@ -37,7 +35,7 @@ const calculateDeliveryFee = (distanceKm: number): number => {
 const Cart = () => {
   const navigate = useNavigate();
   const [cart, setCart] = useState<any[]>([]);
-  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [user, setUser] = useState<any>(null);
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
@@ -107,21 +105,16 @@ const Cart = () => {
     const savedCart = JSON.parse(localStorage.getItem("cart") || "[]");
     setCart(savedCart);
 
-    // Listen for Firebase auth state
-    if (!auth) {
-      console.warn("Firebase auth not initialized");
-      return;
-    }
-
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
+    const fetchUserAndProfile = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
 
       // Auto-fill from saved profile
-      if (firebaseUser) {
+      if (session?.user) {
         const { data: profile, error } = await supabase
           .from("profiles")
           .select("phone, address")
-          .eq("user_id", firebaseUser.uid)
+          .eq("user_id", session.user.id)
           .maybeSingle();
 
         if (error && error.code !== "PGRST116") {
@@ -133,9 +126,9 @@ const Cart = () => {
           if (profile.address && !address) setAddress(profile.address);
         }
       }
-    });
+    };
 
-    return () => unsubscribe();
+    fetchUserAndProfile();
 
     // Fetch store location for delivery fee calculation
     if (savedCart.length > 0) {
@@ -296,7 +289,7 @@ const Cart = () => {
         const { data: order, error: orderError } = await supabase
           .from("orders")
           .insert({
-            user_id: user.uid,
+            user_id: user.id,
             store_id: storeId,
             total_amount: totalWithDelivery,
             delivery_address: address,

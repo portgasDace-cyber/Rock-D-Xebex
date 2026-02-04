@@ -9,8 +9,6 @@ import { Loader2, User, Save } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import AvatarUpload from "@/components/AvatarUpload";
 import { supabase } from "@/integrations/supabase/client";
-import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
-import { auth } from "@/integrations/firebase/config";
 import { toast } from "sonner";
 import beeMascot from "@/assets/bee-mascot.png";
 
@@ -18,31 +16,27 @@ const Profile = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [user, setUser] = useState<any>(null);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!auth) {
-      console.warn("Firebase auth not initialized");
-      navigate("/auth");
-      return;
-    }
-
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (!firebaseUser) {
+    const fetchProfile = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
         navigate("/auth");
         return;
       }
 
-      setUser(firebaseUser);
+      setUser(session.user);
 
       const { data: profile, error } = await supabase
         .from("profiles")
         .select("*")
-        .eq("user_id", firebaseUser.uid)
+        .eq("user_id", session.user.id)
         .maybeSingle();
 
       if (error && error.code !== "PGRST116") {
@@ -57,9 +51,9 @@ const Profile = () => {
       }
 
       setLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
+    fetchProfile();
   }, [navigate]);
 
   const handleSave = async (e: React.FormEvent) => {
@@ -67,13 +61,13 @@ const Profile = () => {
     setSaving(true);
 
     try {
-      if (!user?.uid) throw new Error("Not authenticated");
+      if (!user?.id) throw new Error("Not authenticated");
 
       const { error } = await supabase
         .from("profiles")
         .upsert(
           {
-            user_id: user.uid,
+            user_id: user.id,
             full_name: fullName || null,
             phone,
             address,
@@ -136,16 +130,14 @@ const Profile = () => {
             </CardHeader>
             <CardContent>
               {/* Avatar Upload */}
-              {user && (
-                <div className="mb-6">
-                  <AvatarUpload
-                    userId={user.uid}
-                    avatarUrl={avatarUrl}
-                    fullName={fullName}
-                    onUpload={setAvatarUrl}
-                  />
-                </div>
-              )}
+              <div className="mb-6">
+                <AvatarUpload
+                  userId={user.id}
+                  avatarUrl={avatarUrl}
+                  fullName={fullName}
+                  onUpload={setAvatarUrl}
+                />
+              </div>
 
               <form onSubmit={handleSave} className="space-y-4">
                 <div>
