@@ -144,7 +144,7 @@ const handler = async (req: Request): Promise<Response> => {
       },
       body: JSON.stringify({
         from: "Kunnathur Carry Bee <onboarding@resend.dev>",
-        to: ["ravishangaraarya24@gmail.com"],
+        to: ["beehivecarrybee@gmail.com"],
         subject: `🐝 New Order #${orderId.slice(0, 8)} - ${storeName}`,
         html: emailHtml,
       }),
