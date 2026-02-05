@@ -141,6 +141,20 @@ const Profile = () => {
 
               <form onSubmit={handleSave} className="space-y-4">
                 <div>
+                  <Label htmlFor="userId">User ID</Label>
+                  <Input
+                    id="userId"
+                    type="text"
+                    value={user?.id || ""}
+                    disabled
+                    className="mt-1 bg-muted font-mono text-xs"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Share this ID with the main admin if you need store admin access
+                  </p>
+                </div>
+
+                <div>
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
