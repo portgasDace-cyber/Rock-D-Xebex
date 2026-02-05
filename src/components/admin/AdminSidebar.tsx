@@ -1,4 +1,4 @@
-import { Store, Package, ShoppingCart, BarChart3, Home, LogOut, Sparkles } from "lucide-react";
+import { Store, Package, ShoppingCart, BarChart3, Home, LogOut, Sparkles, UserCog } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,6 +8,7 @@ import beeMascot from "@/assets/bee-mascot.png";
 const menuItems = [
   { title: "Dashboard", url: "/admin", icon: BarChart3 },
   { title: "Stores", url: "/admin/stores", icon: Store },
+  { title: "Store Admins", url: "/admin/store-admins", icon: UserCog },
   { title: "Products", url: "/admin/products", icon: Package },
   { title: "Orders", url: "/admin/orders", icon: ShoppingCart },
   { title: "Daily Offers", url: "/admin/offers", icon: Sparkles },
