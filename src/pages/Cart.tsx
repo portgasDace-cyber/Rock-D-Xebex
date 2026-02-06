@@ -342,6 +342,20 @@ const Cart = () => {
         } catch (emailError) {
           console.error("Failed to send order email:", emailError);
         }
+
+        // Send push notification to store admin
+        try {
+          await supabase.functions.invoke("notify-store-admin", {
+            body: {
+              storeId: storeId,
+              orderId: order.id,
+              totalAmount: totalWithDelivery,
+            },
+          });
+          console.log("Store admin notification sent");
+        } catch (notifyError) {
+          console.error("Failed to notify store admin:", notifyError);
+        }
       }
 
       // Clear cart

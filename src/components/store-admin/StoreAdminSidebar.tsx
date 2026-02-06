@@ -1,17 +1,18 @@
- import { Link, useLocation, useNavigate } from "react-router-dom";
- import { cn } from "@/lib/utils";
- import { LayoutDashboard, ShoppingCart, LogOut, Store, Home } from "lucide-react";
- import { supabase } from "@/integrations/supabase/client";
- import { toast } from "sonner";
- 
- interface StoreAdminSidebarProps {
-   storeName: string;
- }
- 
- const navItems = [
-   { href: "/store-admin", label: "Dashboard", icon: LayoutDashboard },
-   { href: "/store-admin/orders", label: "Orders", icon: ShoppingCart },
- ];
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { cn } from "@/lib/utils";
+import { LayoutDashboard, ShoppingCart, LogOut, Store, Home, Package } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+interface StoreAdminSidebarProps {
+  storeName: string;
+}
+
+const navItems = [
+  { href: "/store-admin", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/store-admin/orders", label: "Orders", icon: ShoppingCart },
+  { href: "/store-admin/products", label: "Products", icon: Package },
+];
  
  export const StoreAdminSidebar = ({ storeName }: StoreAdminSidebarProps) => {
    const location = useLocation();
