@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Package, Edit, Search, IndianRupee } from "lucide-react";
+import { Package, Edit, Search, IndianRupee, Plus } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useStoreAdmin } from "@/hooks/useStoreAdmin";
@@ -38,6 +39,16 @@ const StoreAdminProducts = () => {
     offer_percentage: 0,
   });
   const [updating, setUpdating] = useState(false);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [addingProduct, setAddingProduct] = useState(false);
+  const [newProduct, setNewProduct] = useState({
+    name: "",
+    description: "",
+    price: 0,
+    category: "",
+    image_url: "",
+    in_stock: true,
+  });
 
   const fetchProducts = async () => {
     if (!storeAdminInfo?.store_id) return;
@@ -115,6 +126,37 @@ const StoreAdminProducts = () => {
     fetchProducts();
   };
 
+  const handleAddProduct = async () => {
+    if (!storeAdminInfo?.store_id || !newProduct.name || newProduct.price <= 0) {
+      toast.error("Please fill in product name and a valid price");
+      return;
+    }
+
+    setAddingProduct(true);
+
+    const { error } = await supabase.from("products").insert({
+      store_id: storeAdminInfo.store_id,
+      name: newProduct.name,
+      description: newProduct.description || null,
+      price: newProduct.price,
+      category: newProduct.category || null,
+      image_url: newProduct.image_url || null,
+      in_stock: newProduct.in_stock,
+    });
+
+    if (error) {
+      toast.error("Failed to add product");
+      setAddingProduct(false);
+      return;
+    }
+
+    toast.success("Product added successfully");
+    setAddingProduct(false);
+    setShowAddDialog(false);
+    setNewProduct({ name: "", description: "", price: 0, category: "", image_url: "", in_stock: true });
+    fetchProducts();
+  };
+
   const filteredProducts = products.filter((product) =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     product.category?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -128,6 +170,10 @@ const StoreAdminProducts = () => {
             <h1 className="text-3xl font-outfit font-bold">Products</h1>
             <p className="text-muted-foreground">Manage your store's product prices and stock</p>
           </div>
+          <Button onClick={() => setShowAddDialog(true)} className="gap-2">
+            <Plus className="w-4 h-4" />
+            Add Product
+          </Button>
         </div>
 
         <div className="relative max-w-md">
@@ -284,6 +330,80 @@ const StoreAdminProducts = () => {
                 </Button>
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Product Dialog */}
+        <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add New Product</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="new_name">Product Name *</Label>
+                <Input
+                  id="new_name"
+                  value={newProduct.name}
+                  onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                  placeholder="Enter product name"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="new_description">Description</Label>
+                <Textarea
+                  id="new_description"
+                  value={newProduct.description}
+                  onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
+                  placeholder="Enter product description"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="new_price">Price (₹) *</Label>
+                <Input
+                  id="new_price"
+                  type="number"
+                  min="1"
+                  value={newProduct.price}
+                  onChange={(e) => setNewProduct({ ...newProduct, price: Number(e.target.value) })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="new_category">Category</Label>
+                <Input
+                  id="new_category"
+                  value={newProduct.category}
+                  onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
+                  placeholder="e.g. Groceries, Snacks, Beverages"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="new_image_url">Image URL</Label>
+                <Input
+                  id="new_image_url"
+                  value={newProduct.image_url}
+                  onChange={(e) => setNewProduct({ ...newProduct, image_url: e.target.value })}
+                  placeholder="https://example.com/image.jpg"
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Label htmlFor="new_in_stock">In Stock</Label>
+                <Switch
+                  id="new_in_stock"
+                  checked={newProduct.in_stock}
+                  onCheckedChange={(checked) => setNewProduct({ ...newProduct, in_stock: checked })}
+                />
+              </div>
+
+              <Button onClick={handleAddProduct} className="w-full" disabled={addingProduct}>
+                {addingProduct ? "Adding..." : "Add Product"}
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
