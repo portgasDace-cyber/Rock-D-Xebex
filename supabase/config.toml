@@ -5,3 +5,12 @@ verify_jwt = false
 
 [functions.send-product-request]
 verify_jwt = false
+
+[functions.notify-store-admin]
+verify_jwt = false
+
+[functions.send-order-status-notification]
+verify_jwt = false
+
+[functions.send-push-notification]
+verify_jwt = false
