@@ -1,4 +1,4 @@
-import { ShoppingCart, User, Menu, Shield } from "lucide-react";
+import { ShoppingCart, User, Menu, Shield, Store } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -17,6 +17,7 @@ const Navbar = () => {
   const [user, setUser] = useState<any>(null);
   const [cartCount, setCartCount] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isStoreAdmin, setIsStoreAdmin] = useState(false);
   const [profileName, setProfileName] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
@@ -29,6 +30,14 @@ const Navbar = () => {
       .eq("role", "admin")
       .maybeSingle();
     setIsAdmin(!!roleData);
+
+    // Check store admin role
+    const { data: storeAdminData } = await supabase
+      .from("store_admins")
+      .select("store_id")
+      .eq("user_id", userId)
+      .maybeSingle();
+    setIsStoreAdmin(!!storeAdminData);
 
     // Get profile
     const { data: profileData } = await supabase
@@ -56,6 +65,7 @@ const Navbar = () => {
         setTimeout(() => fetchProfile(session.user.id), 0);
       } else {
         setIsAdmin(false);
+        setIsStoreAdmin(false);
         setProfileName(null);
         setAvatarUrl(null);
       }
@@ -169,6 +179,17 @@ const Navbar = () => {
                         <Link to="/admin" className="flex items-center gap-2">
                           <Shield className="w-4 h-4" />
                           Admin Panel
+                        </Link>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  {isStoreAdmin && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <Link to="/store-admin" className="flex items-center gap-2">
+                          <Store className="w-4 h-4" />
+                          Store Admin
                         </Link>
                       </DropdownMenuItem>
                     </>
