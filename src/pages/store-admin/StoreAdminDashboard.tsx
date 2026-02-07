@@ -1,9 +1,10 @@
- import { useEffect, useState } from "react";
- import { StoreAdminLayout } from "@/components/store-admin/StoreAdminLayout";
- import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
- import { ShoppingCart, Clock, Truck, CheckCircle2 } from "lucide-react";
- import { supabase } from "@/integrations/supabase/client";
- import { useStoreAdmin } from "@/hooks/useStoreAdmin";
+import { useEffect, useState } from "react";
+import { StoreAdminLayout } from "@/components/store-admin/StoreAdminLayout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ShoppingCart, Clock, Truck, CheckCircle2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useStoreAdmin } from "@/hooks/useStoreAdmin";
+import { StoreAdminNotificationToggle } from "@/components/store-admin/StoreAdminNotificationToggle";
  
  const StoreAdminDashboard = () => {
    const { storeAdminInfo } = useStoreAdmin();
@@ -43,10 +44,12 @@
            <h1 className="text-3xl font-outfit font-bold">Dashboard</h1>
            <p className="text-muted-foreground">
              Welcome to {storeAdminInfo?.stores?.name || "your store"} admin panel
-           </p>
-         </div>
- 
-         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          </p>
+          </div>
+
+          <StoreAdminNotificationToggle />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
            <Card className="bg-orange-50 dark:bg-orange-950/20 border-orange-200">
              <CardHeader className="flex flex-row items-center justify-between pb-2">
                <CardTitle className="text-sm font-medium text-orange-700">Pending</CardTitle>
