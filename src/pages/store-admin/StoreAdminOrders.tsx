@@ -1,361 +1,204 @@
- import { useEffect, useState } from "react";
- import { StoreAdminLayout } from "@/components/store-admin/StoreAdminLayout";
- import { Card, CardContent } from "@/components/ui/card";
- import { Button } from "@/components/ui/button";
- import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
- import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
- import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
- import { ShoppingCart, MapPin, Phone, ExternalLink, CheckCircle2, Truck, Package, Bell, Volume2, VolumeX } from "lucide-react";
- import { supabase } from "@/integrations/supabase/client";
- import { toast } from "sonner";
- import { format } from "date-fns";
- import OrderTimeline from "@/components/OrderTimeline";
- import { useStoreAdmin } from "@/hooks/useStoreAdmin";
- import { useOrderSound } from "@/hooks/useOrderSound";
- 
- interface OrderData {
-   id: string;
-   created_at: string;
-   total_amount: number;
-   status: string;
-   delivery_address: string;
-   phone: string;
-   user_id: string;
-   latitude: number | null;
-   longitude: number | null;
-   order_items?: Array<{
-     id: string;
-     quantity: number;
-     price: number;
-     products?: { name: string };
-   }>;
- }
- 
- const StoreAdminOrders = () => {
-   const { storeAdminInfo } = useStoreAdmin();
-   const [orders, setOrders] = useState<OrderData[]>([]);
-   const [loading, setLoading] = useState(true);
-   const [selectedOrder, setSelectedOrder] = useState<OrderData | null>(null);
-   const [filter, setFilter] = useState<string>("all");
-   const [updatingStatus, setUpdatingStatus] = useState(false);
-   const [soundEnabled, setSoundEnabled] = useState(true);
-   const { playNotificationSound } = useOrderSound();
- 
-   const fetchOrders = async () => {
-     if (!storeAdminInfo?.store_id) return;
- 
-     let query = supabase
-       .from("orders")
-       .select("*, order_items(id, quantity, price, products(name))")
-       .eq("store_id", storeAdminInfo.store_id)
-       .order("created_at", { ascending: false });
- 
-     if (filter !== "all") {
-       query = query.eq("status", filter);
-     }
- 
-     const { data, error } = await query;
-     if (!error) {
-       setOrders(data || []);
-     }
-     setLoading(false);
-   };
- 
-   useEffect(() => {
-     if (!storeAdminInfo?.store_id) return;
- 
-     fetchOrders();
- 
-     const channel = supabase
-       .channel('store-admin-orders-realtime')
-       .on(
-         'postgres_changes',
-         {
-           event: '*',
-           schema: 'public',
-           table: 'orders',
-           filter: `store_id=eq.${storeAdminInfo.store_id}`,
-         },
-         (payload) => {
-           if (payload.eventType === 'INSERT') {
-             if (soundEnabled) {
-               playNotificationSound();
-             }
-             toast.success("🔔 New order received!", {
-               description: `Order #${(payload.new as OrderData).id.slice(0, 8)}`,
-               icon: <Bell className="w-4 h-4" />,
-               duration: 8000,
-             });
-           }
-           fetchOrders();
-         }
-       )
-       .subscribe();
- 
-     return () => {
-       supabase.removeChannel(channel);
-     };
-   }, [storeAdminInfo?.store_id, filter, soundEnabled, playNotificationSound]);
- 
-   const updateOrderStatus = async (orderId: string, newStatus: string) => {
-     setUpdatingStatus(true);
-     const { error } = await supabase.from("orders").update({ status: newStatus }).eq("id", orderId);
-     
-     if (error) {
-       toast.error("Failed to update order status");
-       setUpdatingStatus(false);
-       return;
-     }
- 
-     toast.success(`Order marked as ${newStatus.replace(/_/g, " ")}`);
-     setUpdatingStatus(false);
-     setSelectedOrder(null);
-   };
- 
-   const getStatusColor = (status: string) => {
-     switch (status) {
-       case "pending":
-         return "bg-orange-100 text-orange-700";
-       case "accepted":
-         return "bg-blue-100 text-blue-700";
-       case "out_for_delivery":
-         return "bg-purple-100 text-purple-700";
-       case "delivered":
-         return "bg-emerald-100 text-emerald-700";
-       case "cancelled":
-         return "bg-red-100 text-red-700";
-       default:
-         return "bg-gray-100 text-gray-700";
-     }
-   };
- 
-   const getNextStatus = (currentStatus: string) => {
-     switch (currentStatus) {
-       case "pending":
-         return "accepted";
-       case "accepted":
-         return "out_for_delivery";
-       case "out_for_delivery":
-         return "delivered";
-       default:
-         return null;
-     }
-   };
- 
-   const getNextStatusLabel = (currentStatus: string) => {
-     switch (currentStatus) {
-       case "pending":
-         return "Accept Order";
-       case "accepted":
-         return "Out for Delivery";
-       case "out_for_delivery":
-         return "Mark Delivered";
-       default:
-         return null;
-     }
-   };
- 
-   return (
-     <StoreAdminLayout>
-       <div className="space-y-6">
-         <div className="flex items-center justify-between flex-wrap gap-3">
-           <div>
-             <h1 className="text-3xl font-outfit font-bold">Orders</h1>
-             <p className="text-muted-foreground">Manage your store orders</p>
-           </div>
- 
-           <div className="flex items-center gap-3">
-             <Button
-               variant="outline"
-               size="sm"
-               onClick={() => setSoundEnabled(!soundEnabled)}
-               className="flex items-center gap-2"
-             >
-               {soundEnabled ? (
-                 <>
-                   <Volume2 className="w-4 h-4" />
-                   <span className="hidden sm:inline">Sound On</span>
-                 </>
-               ) : (
-                 <>
-                   <VolumeX className="w-4 h-4" />
-                   <span className="hidden sm:inline">Sound Off</span>
-                 </>
-               )}
-             </Button>
- 
-             <Select value={filter} onValueChange={setFilter}>
-               <SelectTrigger className="w-[180px]">
-                 <SelectValue placeholder="Filter by status" />
-               </SelectTrigger>
-               <SelectContent>
-                 <SelectItem value="all">All Orders</SelectItem>
-                 <SelectItem value="pending">Pending</SelectItem>
-                 <SelectItem value="accepted">Accepted</SelectItem>
-                 <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
-                 <SelectItem value="delivered">Delivered</SelectItem>
-                 <SelectItem value="cancelled">Cancelled</SelectItem>
-               </SelectContent>
-             </Select>
-           </div>
-         </div>
- 
-         <Card>
-           <CardContent className="p-0">
-             {loading ? (
-               <div className="p-8 text-center text-muted-foreground">Loading...</div>
-             ) : orders.length === 0 ? (
-               <div className="p-8 text-center text-muted-foreground">
-                 <ShoppingCart className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                 <p>No orders found</p>
-               </div>
-             ) : (
-               <Table>
-                 <TableHeader>
-                   <TableRow>
-                     <TableHead>Order ID</TableHead>
-                     <TableHead>Date</TableHead>
-                     <TableHead>Phone</TableHead>
-                     <TableHead>Amount</TableHead>
-                     <TableHead>Status</TableHead>
-                     <TableHead className="text-right">Actions</TableHead>
-                   </TableRow>
-                 </TableHeader>
-                 <TableBody>
-                   {orders.map((order) => (
-                     <TableRow key={order.id}>
-                       <TableCell className="font-mono text-sm">#{order.id.slice(0, 8)}</TableCell>
-                       <TableCell>{format(new Date(order.created_at), "dd MMM, hh:mm a")}</TableCell>
-                       <TableCell>{order.phone}</TableCell>
-                       <TableCell className="font-bold text-primary">₹{order.total_amount}</TableCell>
-                       <TableCell>
-                         <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(order.status || "pending")}`}>
-                           {order.status?.replace(/_/g, " ") || "pending"}
-                         </span>
-                       </TableCell>
-                       <TableCell className="text-right">
-                         <Button variant="ghost" size="sm" onClick={() => setSelectedOrder(order)}>
-                           View Details
-                         </Button>
-                       </TableCell>
-                     </TableRow>
-                   ))}
-                 </TableBody>
-               </Table>
-             )}
-           </CardContent>
-         </Card>
- 
-         {/* Order Details Dialog */}
-         <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
-           <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-             <DialogHeader>
-               <DialogTitle>Order #{selectedOrder?.id.slice(0, 8)}</DialogTitle>
-             </DialogHeader>
-             {selectedOrder && (
-               <div className="space-y-6">
-                 <div className="grid grid-cols-2 gap-4 text-sm">
-                   <div>
-                     <p className="text-muted-foreground">Date</p>
-                     <p className="font-medium">{format(new Date(selectedOrder.created_at), "dd MMM yyyy, hh:mm a")}</p>
-                   </div>
-                   <div>
-                     <p className="text-muted-foreground flex items-center gap-1"><Phone className="w-3 h-3" /> Phone</p>
-                     <p className="font-medium">{selectedOrder.phone}</p>
-                   </div>
-                   <div>
-                     <p className="text-muted-foreground">Status</p>
-                     <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(selectedOrder.status || "pending")}`}>
-                       {selectedOrder.status?.replace(/_/g, " ") || "pending"}
-                     </span>
-                   </div>
-                 </div>
- 
-                 <div>
-                   <p className="text-muted-foreground flex items-center gap-1 mb-1"><MapPin className="w-3 h-3" /> Delivery Address</p>
-                   <p className="font-medium">{selectedOrder.delivery_address}</p>
-                   {selectedOrder.latitude && selectedOrder.longitude && (
-                     <a
-                       href={`https://www.google.com/maps?q=${selectedOrder.latitude},${selectedOrder.longitude}`}
-                       target="_blank"
-                       rel="noopener noreferrer"
-                       className="text-primary text-sm flex items-center gap-1 mt-1 hover:underline"
-                     >
-                       <ExternalLink className="w-3 h-3" />
-                       View on Map
-                     </a>
-                   )}
-                 </div>
- 
-                 <div>
-                   <p className="text-muted-foreground mb-2">Order Items</p>
-                   <div className="space-y-2">
-                     {selectedOrder.order_items?.map((item) => (
-                       <div key={item.id} className="flex justify-between items-center bg-secondary/50 p-3 rounded-lg">
-                         <div>
-                           <p className="font-medium">{item.products?.name}</p>
-                           <p className="text-sm text-muted-foreground">Qty: {item.quantity}</p>
-                         </div>
-                         <p className="font-bold">₹{item.price * item.quantity}</p>
-                       </div>
-                     ))}
-                   </div>
-                   <div className="flex justify-between items-center mt-4 pt-4 border-t">
-                     <p className="font-semibold">Total Amount</p>
-                     <p className="text-xl font-bold text-primary">₹{selectedOrder.total_amount}</p>
-                   </div>
-                 </div>
- 
-                 <div>
-                   <p className="text-muted-foreground mb-3">Order Progress</p>
-                   <OrderTimeline status={selectedOrder.status || "pending"} />
-                 </div>
- 
-                 {selectedOrder.status !== "delivered" && selectedOrder.status !== "cancelled" && (
-                   <div className="space-y-3 pt-4 border-t">
-                     <p className="text-muted-foreground text-sm font-medium">Update Status</p>
-                     <div className="flex flex-col gap-2">
-                       {getNextStatus(selectedOrder.status || "pending") && (
-                         <Button 
-                           size="sm" 
-                           className="w-full bg-primary hover:bg-primary/90"
-                           disabled={updatingStatus}
-                           onClick={() => updateOrderStatus(selectedOrder.id, getNextStatus(selectedOrder.status || "pending")!)}
-                         >
-                           {updatingStatus ? (
-                             <span className="flex items-center gap-2">
-                               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                               Updating...
-                             </span>
-                           ) : (
-                             <>
-                               {selectedOrder.status === "pending" && <CheckCircle2 className="w-4 h-4 mr-2" />}
-                               {selectedOrder.status === "accepted" && <Truck className="w-4 h-4 mr-2" />}
-                               {selectedOrder.status === "out_for_delivery" && <Package className="w-4 h-4 mr-2" />}
-                               {getNextStatusLabel(selectedOrder.status || "pending")}
-                             </>
-                           )}
-                         </Button>
-                       )}
-                       <Button 
-                         size="sm" 
-                         variant="destructive" 
-                         className="w-full"
-                         disabled={updatingStatus}
-                         onClick={() => updateOrderStatus(selectedOrder.id, "cancelled")}
-                       >
-                         Cancel Order
-                       </Button>
-                     </div>
-                   </div>
-                 )}
-               </div>
-             )}
-           </DialogContent>
-         </Dialog>
-       </div>
-     </StoreAdminLayout>
-   );
- };
- 
- export default StoreAdminOrders;
+import { useEffect, useState } from "react";
+import { StoreAdminLayout } from "@/components/store-admin/StoreAdminLayout";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ShoppingCart, Bell, Volume2, VolumeX, CalendarDays } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { format, startOfDay, endOfDay, subDays, startOfWeek } from "date-fns";
+import { useStoreAdmin } from "@/hooks/useStoreAdmin";
+import { useOrderSound } from "@/hooks/useOrderSound";
+import { StoreAdminOrderCard } from "@/components/store-admin/StoreAdminOrderCard";
+import { StoreAdminOrderDialog } from "@/components/store-admin/StoreAdminOrderDialog";
+
+export interface OrderData {
+  id: string;
+  created_at: string;
+  total_amount: number;
+  status: string;
+  delivery_address: string;
+  phone: string;
+  user_id: string;
+  latitude: number | null;
+  longitude: number | null;
+  order_items?: Array<{
+    id: string;
+    quantity: number;
+    price: number;
+    products?: { name: string };
+  }>;
+}
+
+const StoreAdminOrders = () => {
+  const { storeAdminInfo } = useStoreAdmin();
+  const [orders, setOrders] = useState<OrderData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedOrder, setSelectedOrder] = useState<OrderData | null>(null);
+  const [filter, setFilter] = useState<string>("all");
+  const [dateFilter, setDateFilter] = useState<string>("today");
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const { playNotificationSound } = useOrderSound();
+
+  const getDateRange = () => {
+    const now = new Date();
+    switch (dateFilter) {
+      case "today":
+        return { start: startOfDay(now), end: endOfDay(now) };
+      case "yesterday":
+        return { start: startOfDay(subDays(now, 1)), end: endOfDay(subDays(now, 1)) };
+      case "this_week":
+        return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfDay(now) };
+      case "last_7_days":
+        return { start: startOfDay(subDays(now, 7)), end: endOfDay(now) };
+      case "all_time":
+        return null;
+      default:
+        return { start: startOfDay(now), end: endOfDay(now) };
+    }
+  };
+
+  const fetchOrders = async () => {
+    if (!storeAdminInfo?.store_id) return;
+
+    let query = supabase
+      .from("orders")
+      .select("*, order_items(id, quantity, price, products(name))")
+      .eq("store_id", storeAdminInfo.store_id)
+      .order("created_at", { ascending: false });
+
+    if (filter !== "all") {
+      query = query.eq("status", filter);
+    }
+
+    const dateRange = getDateRange();
+    if (dateRange) {
+      query = query.gte("created_at", dateRange.start.toISOString()).lte("created_at", dateRange.end.toISOString());
+    }
+
+    const { data, error } = await query;
+    if (!error) {
+      setOrders(data || []);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    if (!storeAdminInfo?.store_id) return;
+
+    fetchOrders();
+
+    const channel = supabase
+      .channel('store-admin-orders-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: `store_id=eq.${storeAdminInfo.store_id}`,
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            if (soundEnabled) {
+              playNotificationSound();
+            }
+            toast.success("🔔 New order received!", {
+              description: `Order #${(payload.new as OrderData).id.slice(0, 8)}`,
+              icon: <Bell className="w-4 h-4" />,
+              duration: 8000,
+            });
+          }
+          fetchOrders();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [storeAdminInfo?.store_id, filter, dateFilter, soundEnabled, playNotificationSound]);
+
+  return (
+    <StoreAdminLayout>
+      <div className="space-y-4 md:space-y-6">
+        <div className="flex flex-col gap-3">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-outfit font-bold">Orders</h1>
+            <p className="text-sm text-muted-foreground">Manage your store orders</p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              className="flex items-center gap-1.5"
+            >
+              {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+              <span className="hidden sm:inline">{soundEnabled ? "Sound On" : "Sound Off"}</span>
+            </Button>
+
+            <Select value={dateFilter} onValueChange={setDateFilter}>
+              <SelectTrigger className="w-[140px] h-9 text-sm">
+                <CalendarDays className="w-3.5 h-3.5 mr-1.5" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="yesterday">Yesterday</SelectItem>
+                <SelectItem value="this_week">This Week</SelectItem>
+                <SelectItem value="last_7_days">Last 7 Days</SelectItem>
+                <SelectItem value="all_time">All Time</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={filter} onValueChange={setFilter}>
+              <SelectTrigger className="w-[140px] h-9 text-sm">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="accepted">Accepted</SelectItem>
+                <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
+                <SelectItem value="delivered">Delivered</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="p-8 text-center text-muted-foreground">Loading...</div>
+        ) : orders.length === 0 ? (
+          <Card>
+            <CardContent className="p-8 text-center text-muted-foreground">
+              <ShoppingCart className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>No orders found for {dateFilter === "today" ? "today" : dateFilter.replace(/_/g, " ")}</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">{orders.length} order(s)</p>
+            {orders.map((order) => (
+              <StoreAdminOrderCard
+                key={order.id}
+                order={order}
+                onViewDetails={() => setSelectedOrder(order)}
+              />
+            ))}
+          </div>
+        )}
+
+        <StoreAdminOrderDialog
+          order={selectedOrder}
+          onClose={() => setSelectedOrder(null)}
+          onStatusUpdate={() => fetchOrders()}
+        />
+      </div>
+    </StoreAdminLayout>
+  );
+};
+
+export default StoreAdminOrders;
