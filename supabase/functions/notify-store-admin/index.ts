@@ -6,6 +6,111 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Web Push using Web Crypto API (Deno compatible)
+function base64UrlEncode(data: Uint8Array): string {
+  const base64 = btoa(String.fromCharCode(...data));
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function base64UrlDecode(str: string): Uint8Array {
+  str = str.replace(/-/g, '+').replace(/_/g, '/');
+  while (str.length % 4) str += '=';
+  const binary = atob(str);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+async function createJWT(vapidPrivateKey: string, vapidPublicKey: string, audience: string): Promise<string> {
+  const header = { typ: 'JWT', alg: 'ES256' };
+  const now = Math.floor(Date.now() / 1000);
+  const payload = {
+    aud: audience,
+    exp: now + 12 * 3600,
+    sub: 'mailto:beehivecarrybee@gmail.com',
+  };
+
+  const headerB64 = base64UrlEncode(new TextEncoder().encode(JSON.stringify(header)));
+  const payloadB64 = base64UrlEncode(new TextEncoder().encode(JSON.stringify(payload)));
+  const unsignedToken = `${headerB64}.${payloadB64}`;
+
+  // Import the private key
+  const privateKeyBytes = base64UrlDecode(vapidPrivateKey);
+  const key = await crypto.subtle.importKey(
+    'raw',
+    privateKeyBytes,
+    { name: 'ECDSA', namedCurve: 'P-256' },
+    false,
+    ['sign']
+  );
+
+  // Fallback: try JWK import if raw fails
+  const signature = await crypto.subtle.sign(
+    { name: 'ECDSA', hash: 'SHA-256' },
+    key,
+    new TextEncoder().encode(unsignedToken)
+  );
+
+  // Convert DER signature to raw r||s format if needed
+  const sigBytes = new Uint8Array(signature);
+  let rawSig: Uint8Array;
+  if (sigBytes.length === 64) {
+    rawSig = sigBytes;
+  } else {
+    // DER encoded - parse it
+    rawSig = derToRaw(sigBytes);
+  }
+
+  return `${unsignedToken}.${base64UrlEncode(rawSig)}`;
+}
+
+function derToRaw(der: Uint8Array): Uint8Array {
+  const raw = new Uint8Array(64);
+  // DER: 0x30 len 0x02 rLen r 0x02 sLen s
+  let offset = 2; // skip 0x30 and total length
+  if (der[0] !== 0x30) return der.slice(0, 64);
+  
+  // R
+  offset++; // 0x02
+  const rLen = der[offset++];
+  const rStart = rLen > 32 ? offset + (rLen - 32) : offset;
+  const rDest = rLen < 32 ? 32 - rLen : 0;
+  raw.set(der.slice(rStart, offset + rLen), rDest);
+  offset += rLen;
+
+  // S
+  offset++; // 0x02
+  const sLen = der[offset++];
+  const sStart = sLen > 32 ? offset + (sLen - 32) : offset;
+  const sDest = sLen < 32 ? 32 + (32 - sLen) : 32;
+  raw.set(der.slice(sStart, offset + sLen), sDest);
+
+  return raw;
+}
+
+async function sendWebPush(subscription: { endpoint: string; keys: { p256dh: string; auth: string } }, payload: string, vapidPublicKey: string, vapidPrivateKey: string) {
+  const url = new URL(subscription.endpoint);
+  const audience = `${url.protocol}//${url.host}`;
+  
+  const jwt = await createJWT(vapidPrivateKey, vapidPublicKey, audience);
+  
+  const response = await fetch(subscription.endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      'Content-Encoding': 'aes128gcm',
+      'TTL': '86400',
+      'Authorization': `vapid t=${jwt}, k=${vapidPublicKey}`,
+    },
+    body: new TextEncoder().encode(payload),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw { statusCode: response.status, message: `Push failed: ${response.status} ${text}` };
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -18,7 +123,11 @@ serve(async (req) => {
     const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY');
     
     if (!vapidPublicKey || !vapidPrivateKey) {
-      throw new Error('VAPID keys not configured');
+      console.log('VAPID keys not configured, skipping push notification');
+      return new Response(
+        JSON.stringify({ success: true, message: 'VAPID keys not configured' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -37,7 +146,6 @@ serve(async (req) => {
     }
 
     if (!storeAdmins || storeAdmins.length === 0) {
-      console.log('No store admin found for store:', storeId);
       return new Response(
         JSON.stringify({ success: true, message: 'No store admin to notify' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -57,7 +165,6 @@ serve(async (req) => {
     }
 
     if (!subscriptions || subscriptions.length === 0) {
-      console.log('No push subscriptions found for store admins');
       return new Response(
         JSON.stringify({ success: true, message: 'No subscriptions found' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -76,32 +183,19 @@ serve(async (req) => {
 
     const results: Array<{ id: string; status: string; error?: string }> = [];
 
-    // Use web-push npm package via esm.sh
-    const webPush = await import("https://esm.sh/web-push@3.6.7");
-    
-    webPush.setVapidDetails(
-      'mailto:beehivecarrybee@gmail.com',
-      vapidPublicKey,
-      vapidPrivateKey
-    );
-
     for (const sub of subscriptions) {
       try {
-        const pushSubscription = {
-          endpoint: sub.endpoint,
-          keys: {
-            p256dh: sub.p256dh,
-            auth: sub.auth
-          }
-        };
-
-        await webPush.sendNotification(pushSubscription, payload);
+        await sendWebPush(
+          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+          payload,
+          vapidPublicKey,
+          vapidPrivateKey
+        );
         results.push({ id: sub.id, status: 'sent' });
         console.log('Push notification sent to:', sub.id);
       } catch (e: unknown) {
         const error = e as { statusCode?: number; message?: string };
         if (error.statusCode === 410 || error.statusCode === 404) {
-          // Subscription expired, remove it
           await supabase.from('push_subscriptions').delete().eq('id', sub.id);
           results.push({ id: sub.id, status: 'removed' });
         } else {
