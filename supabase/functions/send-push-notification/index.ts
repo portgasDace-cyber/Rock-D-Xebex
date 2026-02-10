@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 serve(async (req) => {
@@ -12,6 +12,43 @@ serve(async (req) => {
   }
 
   try {
+    // Authenticate the caller and verify admin role
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+    }
+
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+    }
+
+    const callerId = claimsData.claims.sub;
+
+    // Verify caller is admin
+    const supabaseService = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+
+    const { data: adminRole } = await supabaseService
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', callerId)
+      .eq('role', 'admin')
+      .maybeSingle();
+
+    if (!adminRole) {
+      return new Response(JSON.stringify({ error: 'Forbidden: Admin only' }), { status: 403, headers: corsHeaders });
+    }
+
     const { title, body, icon, data, userId, sendToAll } = await req.json();
 
     const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY');
@@ -21,12 +58,8 @@ serve(async (req) => {
       throw new Error('VAPID keys not configured');
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
     // Get subscriptions
-    let query = supabase.from('push_subscriptions').select('*');
+    let query = supabaseService.from('push_subscriptions').select('*');
     
     if (!sendToAll && userId) {
       query = query.eq('user_id', userId);
@@ -41,7 +74,6 @@ serve(async (req) => {
     const payload = JSON.stringify({ title, body, icon, data });
     const results: Array<{ id: string; status: string; error?: string }> = [];
 
-    // Use web-push npm package via esm.sh
     const webPush = await import("https://esm.sh/web-push@3.6.7");
     
     webPush.setVapidDetails(
@@ -65,8 +97,7 @@ serve(async (req) => {
       } catch (e: unknown) {
         const error = e as { statusCode?: number; message?: string };
         if (error.statusCode === 410 || error.statusCode === 404) {
-          // Subscription expired, remove it
-          await supabase.from('push_subscriptions').delete().eq('id', sub.id);
+          await supabaseService.from('push_subscriptions').delete().eq('id', sub.id);
           results.push({ id: sub.id, status: 'removed' });
         } else {
           console.error('Push error for subscription:', sub.id, error);

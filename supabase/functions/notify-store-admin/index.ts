@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 // Web Push using Web Crypto API (Deno compatible)
@@ -34,7 +34,6 @@ async function createJWT(vapidPrivateKey: string, vapidPublicKey: string, audien
   const payloadB64 = base64UrlEncode(new TextEncoder().encode(JSON.stringify(payload)));
   const unsignedToken = `${headerB64}.${payloadB64}`;
 
-  // Import the private key
   const privateKeyBytes = base64UrlDecode(vapidPrivateKey);
   const key = await crypto.subtle.importKey(
     'raw',
@@ -44,20 +43,17 @@ async function createJWT(vapidPrivateKey: string, vapidPublicKey: string, audien
     ['sign']
   );
 
-  // Fallback: try JWK import if raw fails
   const signature = await crypto.subtle.sign(
     { name: 'ECDSA', hash: 'SHA-256' },
     key,
     new TextEncoder().encode(unsignedToken)
   );
 
-  // Convert DER signature to raw r||s format if needed
   const sigBytes = new Uint8Array(signature);
   let rawSig: Uint8Array;
   if (sigBytes.length === 64) {
     rawSig = sigBytes;
   } else {
-    // DER encoded - parse it
     rawSig = derToRaw(sigBytes);
   }
 
@@ -66,20 +62,17 @@ async function createJWT(vapidPrivateKey: string, vapidPublicKey: string, audien
 
 function derToRaw(der: Uint8Array): Uint8Array {
   const raw = new Uint8Array(64);
-  // DER: 0x30 len 0x02 rLen r 0x02 sLen s
-  let offset = 2; // skip 0x30 and total length
+  let offset = 2;
   if (der[0] !== 0x30) return der.slice(0, 64);
   
-  // R
-  offset++; // 0x02
+  offset++;
   const rLen = der[offset++];
   const rStart = rLen > 32 ? offset + (rLen - 32) : offset;
   const rDest = rLen < 32 ? 32 - rLen : 0;
   raw.set(der.slice(rStart, offset + rLen), rDest);
   offset += rLen;
 
-  // S
-  offset++; // 0x02
+  offset++;
   const sLen = der[offset++];
   const sStart = sLen > 32 ? offset + (sLen - 32) : offset;
   const sDest = sLen < 32 ? 32 + (32 - sLen) : 32;
@@ -117,7 +110,29 @@ serve(async (req) => {
   }
 
   try {
+    // Authenticate the caller
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+    }
+
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+    }
+
     const { storeId, orderId, totalAmount } = await req.json();
+
+    if (!storeId || !orderId) {
+      return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400, headers: corsHeaders });
+    }
 
     const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY');
     const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY');
@@ -134,7 +149,6 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get store admin for this store
     const { data: storeAdmins, error: adminError } = await supabase
       .from('store_admins')
       .select('user_id')
@@ -152,7 +166,6 @@ serve(async (req) => {
       );
     }
 
-    // Get push subscriptions for all store admins
     const adminUserIds = storeAdmins.map(a => a.user_id);
     const { data: subscriptions, error: subError } = await supabase
       .from('push_subscriptions')

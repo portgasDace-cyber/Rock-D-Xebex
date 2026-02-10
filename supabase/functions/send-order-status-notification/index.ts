@@ -8,7 +8,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 interface StatusNotificationRequest {
@@ -67,6 +67,36 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Authenticate the caller
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+    }
+
+    const supabaseAuth = createClient(
+      SUPABASE_URL!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+    }
+
+    const callerId = claimsData.claims.sub;
+
+    // Verify caller is admin or store admin
+    const supabaseAdmin = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+    
+    const { data: callerRole } = await supabaseAdmin
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', callerId)
+      .eq('role', 'admin')
+      .maybeSingle();
+
     const {
       orderId,
       userId,
@@ -76,10 +106,36 @@ const handler = async (req: Request): Promise<Response> => {
       totalAmount,
     }: StatusNotificationRequest = await req.json();
 
+    if (!orderId || !userId || !newStatus) {
+      return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400, headers: corsHeaders });
+    }
+
+    // If not admin, check if store admin for this order
+    if (!callerRole) {
+      const { data: order } = await supabaseAdmin
+        .from('orders')
+        .select('store_id')
+        .eq('id', orderId)
+        .single();
+
+      if (!order) {
+        return new Response(JSON.stringify({ error: 'Order not found' }), { status: 404, headers: corsHeaders });
+      }
+
+      const { data: storeAdmin } = await supabaseAdmin
+        .from('store_admins')
+        .select('id')
+        .eq('user_id', callerId)
+        .eq('store_id', order.store_id)
+        .maybeSingle();
+
+      if (!storeAdmin) {
+        return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: corsHeaders });
+      }
+    }
+
     console.log("Sending order status notification:", { orderId, newStatus, userId });
 
-    // Get customer email using service role
-    const supabaseAdmin = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
     const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(userId);
     
     if (userError || !userData?.user?.email) {
@@ -91,8 +147,6 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const customerEmail = userData.user.email;
-    console.log("Sending notification to:", customerEmail);
-
     const statusInfo = getStatusMessage(newStatus);
 
     const emailHtml = `
