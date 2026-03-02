@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -42,11 +42,21 @@ interface Store {
 
 const StoreDetail = () => {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const [store, setStore] = useState<Store | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [cart, setCart] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [highlightedProductId, setHighlightedProductId] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Pre-fill search from URL params
+    const searchParam = searchParams.get("search");
+    if (searchParam) setSearchQuery(searchParam);
+    const highlightParam = searchParams.get("highlight");
+    if (highlightParam) setHighlightedProductId(highlightParam);
+  }, [searchParams]);
 
   useEffect(() => {
     if (id) {
@@ -55,6 +65,20 @@ const StoreDetail = () => {
     const savedCart = JSON.parse(localStorage.getItem("cart") || "[]");
     setCart(savedCart);
   }, [id]);
+
+  // Scroll to highlighted product once products load
+  useEffect(() => {
+    if (highlightedProductId && products.length > 0) {
+      const el = document.getElementById(`product-${highlightedProductId}`);
+      if (el) {
+        setTimeout(() => {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 300);
+        // Remove highlight after 3 seconds
+        setTimeout(() => setHighlightedProductId(null), 4000);
+      }
+    }
+  }, [highlightedProductId, products]);
 
   const fetchStoreAndProducts = async () => {
     setLoading(true);
@@ -239,7 +263,12 @@ const StoreDetail = () => {
             return (
               <Card
                 key={product.id}
-                className="overflow-hidden group hover:shadow-lg transition-all animate-scale-in"
+                id={`product-${product.id}`}
+                className={`overflow-hidden group hover:shadow-lg transition-all animate-scale-in ${
+                  highlightedProductId === product.id
+                    ? "ring-2 ring-primary ring-offset-2 shadow-xl scale-[1.02]"
+                    : ""
+                }`}
                 style={{ animationDelay: `${index * 0.05}s` }}
               >
                 <div className="relative h-40 overflow-hidden">
