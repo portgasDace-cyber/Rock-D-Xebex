@@ -9,6 +9,7 @@ import DailyOffers from "@/components/DailyOffers";
 import OffersSection from "@/components/OffersSection";
 import OnboardingGuide from "@/components/OnboardingGuide";
 import { PushNotificationPrompt } from "@/components/PushNotificationPrompt";
+import GlobalSearch from "@/components/GlobalSearch";
 import beeMascot from "@/assets/bee-mascot.png";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -103,6 +104,11 @@ const Home = () => {
           </Card>
         </section>
       )}
+
+      {/* Global Search */}
+      <section className="container mx-auto px-4 pt-8">
+        <GlobalSearch />
+      </section>
 
       {/* Hero Section */}
       <section className="container mx-auto px-4 py-16 md:py-24">
