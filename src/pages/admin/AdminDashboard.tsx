@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Store, Package, ShoppingCart, TrendingUp, Clock, CheckCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Store, Package, ShoppingCart, TrendingUp, Clock, CheckCircle, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface Stats {
   totalStores: number;
@@ -75,6 +78,33 @@ const AdminDashboard = () => {
     fetchStats();
   }, []);
 
+  const handleClearOrders = async (status: string) => {
+    const { error } = await supabase.from("orders").delete().eq("status", status);
+    if (error) {
+      toast.error(`Failed to clear ${status} orders`);
+    } else {
+      toast.success(`${status} orders cleared`);
+      // Re-fetch
+      window.location.reload();
+    }
+  };
+
+  const handleClearAllOrders = async () => {
+    // Delete order_items first, then orders
+    const { data: orders } = await supabase.from("orders").select("id");
+    if (orders && orders.length > 0) {
+      const ids = orders.map((o) => o.id);
+      await supabase.from("order_items").delete().in("order_id", ids);
+      const { error } = await supabase.from("orders").delete().in("id", ids);
+      if (error) {
+        toast.error("Failed to clear all orders");
+      } else {
+        toast.success("All orders cleared");
+        window.location.reload();
+      }
+    }
+  };
+
   const statCards = [
     { title: "Total Stores", value: stats.totalStores, icon: Store, color: "text-blue-500" },
     { title: "Total Products", value: stats.totalProducts, icon: Package, color: "text-green-500" },
@@ -110,6 +140,71 @@ const AdminDashboard = () => {
             </Card>
           ))}
         </div>
+
+        {/* Clear Data Section */}
+        <Card className="border-destructive/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="w-5 h-5" />
+              Clear Data
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-3">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm" className="text-destructive border-destructive/30">
+                  Clear Delivered Orders
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Clear delivered orders?</AlertDialogTitle>
+                  <AlertDialogDescription>This will permanently delete all delivered orders and their items.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => handleClearOrders("delivered")}>Delete</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm" className="text-destructive border-destructive/30">
+                  Clear Cancelled Orders
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Clear cancelled orders?</AlertDialogTitle>
+                  <AlertDialogDescription>This will permanently delete all cancelled orders and their items.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => handleClearOrders("cancelled")}>Delete</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                  Clear All Orders
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Clear ALL orders?</AlertDialogTitle>
+                  <AlertDialogDescription>This will permanently delete all orders and order items. This cannot be undone!</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleClearAllOrders} className="bg-destructive text-destructive-foreground">Delete All</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </CardContent>
+        </Card>
 
         {/* Recent Orders */}
         <Card>

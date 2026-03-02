@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Star, Clock, MapPin, ArrowLeft, Plus, Minus, Percent } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Star, Clock, MapPin, ArrowLeft, Plus, Minus, Percent, Search } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import ProductRequestForm from "@/components/ProductRequestForm";
+import StoreReviews from "@/components/StoreReviews";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
@@ -44,6 +46,7 @@ const StoreDetail = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [cart, setCart] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (id) {
@@ -212,13 +215,26 @@ const StoreDetail = () => {
         </Card>
 
         {/* Products */}
-        <div className="mb-4">
-          <h2 className="text-2xl font-outfit font-bold">Menu</h2>
-          <p className="text-muted-foreground">Available products</p>
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-outfit font-bold">Menu</h2>
+            <p className="text-muted-foreground">Available products</p>
+          </div>
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search products..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {products.map((product, index) => {
+          {products
+            .filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || (p.category?.toLowerCase().includes(searchQuery.toLowerCase())))
+            .map((product, index) => {
             const quantity = getProductQuantity(product.id);
             return (
               <Card
@@ -332,6 +348,11 @@ const StoreDetail = () => {
         {/* Product Request Form */}
         <div className="mt-8">
           <ProductRequestForm storeId={id} storeName={store?.name} />
+        </div>
+
+        {/* Reviews Section */}
+        <div className="mt-8">
+          <StoreReviews storeId={id!} />
         </div>
       </div>
 
