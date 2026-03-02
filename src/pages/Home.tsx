@@ -12,6 +12,7 @@ import { PushNotificationPrompt } from "@/components/PushNotificationPrompt";
 import GlobalSearch from "@/components/GlobalSearch";
 import beeMascot from "@/assets/bee-mascot.png";
 import { supabase } from "@/integrations/supabase/client";
+import Reviews from "@/components/Reviews";
 
 const ONBOARDING_KEY = "carrybee_onboarding_complete";
 
@@ -71,7 +72,7 @@ const Home = () => {
     {
       icon: <Heart className="w-8 h-8 text-primary" />,
       title: "Community First",
-      description: "Built for Kunnathur, by Kunnathur",
+      description: "The best delivery app, built for Kunnathur, by Kunnathur",
     },
   ];
 
@@ -119,7 +120,7 @@ const Home = () => {
               <span className="text-primary">Friendly</span> Delivery
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl">
-              Order from your favorite local stores in Kunnathur. Fresh groceries, medicines, delicious food - delivered to your doorstep!
+              Order from your favorite local stores with the best delivery app in Kunnathur. Fresh groceries, medicines, delicious food - delivered to your doorstep!
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
               <Link to="/stores">
@@ -150,7 +151,7 @@ const Home = () => {
 
       {/* Features Section */}
       <section className="container mx-auto px-4 py-16">
-        <h2 className="text-3xl md:text-4xl font-outfit font-bold text-center mb-12">Why Choose Carry Bee?</h2>
+        <h2 className="text-3xl md:text-4xl font-outfit font-bold text-center mb-12">The Best Delivery App in Kunnathur</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {features.map((feature, index) => (
             <Card
@@ -169,6 +170,8 @@ const Home = () => {
           ))}
         </div>
       </section>
+
+      <Reviews />
 
       {/* CTA Section */}
       <section className="container mx-auto px-4 py-16">
@@ -195,7 +198,7 @@ const Home = () => {
               <img src={beeMascot} alt="Carry Bee" className="w-8 h-8" />
               <span className="font-outfit font-semibold text-foreground">Kunnathur Carry Bee</span>
             </div>
-            <p className="text-sm text-muted-foreground text-center">© 2025 Kunnathur Carry Bee. Fast, local & friendly delivery.</p>
+            <p className="text-sm text-muted-foreground text-center">© 2025 Kunnathur Carry Bee. The best delivery app in Kunnathur.</p>
           </div>
         </div>
       </footer>
