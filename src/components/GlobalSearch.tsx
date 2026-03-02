@@ -59,7 +59,7 @@ const GlobalSearch = () => {
     setQuery("");
     setResults([]);
     setOpen(false);
-    navigate(`/store/${result.store_id}`);
+    navigate(`/store/${result.store_id}?highlight=${encodeURIComponent(result.id)}&search=${encodeURIComponent(result.name)}`);
   };
 
   return (
