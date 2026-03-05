@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { HashRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import Stores from "./pages/Stores";
 import StoreDetail from "./pages/StoreDetail";
@@ -20,6 +20,9 @@ import AdminOffers from "./pages/admin/AdminOffers";
 import StoreAdminDashboard from "./pages/store-admin/StoreAdminDashboard";
 import StoreAdminOrders from "./pages/store-admin/StoreAdminOrders";
 import StoreAdminProducts from "./pages/store-admin/StoreAdminProducts";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
+import Refund from "./pages/Refund";
 
 const queryClient = new QueryClient();
 
@@ -28,7 +31,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <HashRouter>
+      <BrowserRouter>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/stores" element={<Stores />} />
@@ -37,6 +40,9 @@ const App = () => (
           <Route path="/auth" element={<Auth />} />
           <Route path="/orders" element={<Orders />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/refund" element={<Refund />} />
           {/* Admin Routes */}
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/stores" element={<AdminStores />} />
@@ -51,7 +57,7 @@ const App = () => (
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
-      </HashRouter>
+      </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
 );
