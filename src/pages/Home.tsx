@@ -193,12 +193,23 @@ const Home = () => {
       {/* Footer */}
       <footer className="border-t border-border mt-16">
         <div className="container mx-auto px-4 py-8">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
             <div className="flex items-center gap-2">
               <img src={beeMascot} alt="Carry Bee" className="w-8 h-8" />
               <span className="font-outfit font-semibold text-foreground">Kunnathur Carry Bee</span>
             </div>
-            <p className="text-sm text-muted-foreground text-center">© 2025 Kunnathur Carry Bee. The best delivery app in Kunnathur.</p>
+            <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
+              <Link to="/privacy-policy" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+                Privacy Policy
+              </Link>
+              <Link to="/refund-policy" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+                Refund Policy
+              </Link>
+              <Link to="/terms" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+                Terms & Conditions
+              </Link>
+            </div>
+            <p className="text-sm text-muted-foreground text-center md:text-right">© 2025 Kunnathur Carry Bee. All Rights Reserved.</p>
           </div>
         </div>
       </footer>

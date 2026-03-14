@@ -20,9 +20,9 @@ import AdminOffers from "./pages/admin/AdminOffers";
 import StoreAdminDashboard from "./pages/store-admin/StoreAdminDashboard";
 import StoreAdminOrders from "./pages/store-admin/StoreAdminOrders";
 import StoreAdminProducts from "./pages/store-admin/StoreAdminProducts";
-import Terms from "./pages/Terms";
-import Privacy from "./pages/Privacy";
-import Refund from "./pages/Refund";
+import TermsAndConditions from "./pages/TermsAndConditions";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import RefundPolicy from "./pages/RefundPolicy";
 
 const queryClient = new QueryClient();
 
@@ -40,9 +40,9 @@ const App = () => (
           <Route path="/auth" element={<Auth />} />
           <Route path="/orders" element={<Orders />} />
           <Route path="/profile" element={<Profile />} />
-          <Route path="/terms" element={<Terms />} />
-          <Route path="/privacy" element={<Privacy />} />
-          <Route path="/refund" element={<Refund />} />
+          <Route path="/terms" element={<TermsAndConditions />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/refund-policy" element={<RefundPolicy />} />
           {/* Admin Routes */}
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/stores" element={<AdminStores />} />
